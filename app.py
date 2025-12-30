@@ -606,9 +606,9 @@ def verify_data():
         except Exception as e:
             response["file_size_error"] = str(e)
         
-        # Try reading directly with pandas to catch the actual error
+        # Use load_dataset which handles parquet, csv, and csv.gz
         try:
-            df = pd.read_parquet(DATA_PATH)
+            df = load_dataset(DATA_PATH)
             response["total_rows"] = len(df)
             response["columns"] = list(df.columns)
             response["read_success"] = True
@@ -621,13 +621,6 @@ def verify_data():
         except Exception as e:
             response["read_error"] = str(e)
             response["read_success"] = False
-            # Also try with load_dataset to see if cache is the issue
-            try:
-                df_cached = load_dataset(DATA_PATH)
-                response["cached_rows"] = len(df_cached)
-                response["cached_note"] = "Loaded via cached function"
-            except Exception as e2:
-                response["cached_error"] = str(e2)
     
     return response
 
