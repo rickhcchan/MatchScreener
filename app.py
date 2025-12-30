@@ -606,10 +606,12 @@ def verify_data():
         except Exception as e:
             response["file_size_error"] = str(e)
         
+        # Try reading directly with pandas to catch the actual error
         try:
-            df = load_dataset(DATA_PATH)
+            df = pd.read_parquet(DATA_PATH)
             response["total_rows"] = len(df)
             response["columns"] = list(df.columns)
+            response["read_success"] = True
             
             # Get first 5 rows as sample
             if len(df) > 0:
@@ -617,7 +619,15 @@ def verify_data():
                 # Convert to dict records for JSON serialization
                 response["sample_rows"] = sample_df.to_dict(orient="records")
         except Exception as e:
-            response["load_error"] = str(e)
+            response["read_error"] = str(e)
+            response["read_success"] = False
+            # Also try with load_dataset to see if cache is the issue
+            try:
+                df_cached = load_dataset(DATA_PATH)
+                response["cached_rows"] = len(df_cached)
+                response["cached_note"] = "Loaded via cached function"
+            except Exception as e2:
+                response["cached_error"] = str(e2)
     
     return response
 
