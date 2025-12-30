@@ -1,0 +1,121 @@
+body { font-family: Arial, sans-serif; margin: 20px; background: #000000; color: #FFFFFF; }
+header { margin-bottom: 12px; }
+.meta { margin-bottom: 12px; color: #b0b0b0; }
+.small { color: #b0b0b0; font-size: 0.9em; }
+.actions a { margin-right: 8px; }
+
+/* Card list layout */
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.card { border: 1px solid #141414; border-radius: 3px; padding: 12px; background: #141414; box-shadow: 0 1px 3px rgba(0,0,0,0.35); width: 100%; position: relative; box-sizing: border-box; }
+.card .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.teams { display: block; }
+.header-grid { display: grid; grid-template-columns: 320px 60px; gap: 4px; align-items: center; }
+.home-name { grid-column: 1; grid-row: 1; }
+.away-name { grid-column: 1; grid-row: 2; }
+.home-score { grid-column: 2; grid-row: 1; justify-self: start; }
+.away-score { grid-column: 2; grid-row: 2; justify-self: start; }
+
+@media (max-width: 900px) {
+	/* Fix score column alignment across cards on mobile by using fixed widths */
+	.header-grid { grid-template-columns: 220px 50px; }
+	/* Switch odds grid to 2x2 on small screens */
+}
+.team-name { font-weight: 700; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { margin-top: 6px; font-weight: 600; }
+.status.pre { color: #a6a6a6; }
+.status.live { color: #5192fb; }
+.status.ended { color: #db3625; }
+.time { font-size: 14px; }
+.time::before { content: "⏱"; margin-right: 6px; font-size: 12px; }
+
+.odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 0px; }
+@media (max-width: 900px) {
+	.odds { grid-template-columns: repeat(2, 1fr); }
+}
+.odd { border-radius: 3px; padding: 4px; text-align: center; }
+.odd .label { font-size: 14px; color: #fff; margin-bottom: 6px; text-align: center; }
+.prices { display: flex; justify-content: center; gap: 4px; }
+.badge { display: inline-block; padding: 6px 6px; border-radius: 3px; font-weight: 700; font-size: 12px; width: 9ch; text-align: center; font-variant-numeric: tabular-nums; }
+.badge.back { background: #00B073; color: #fff; }
+.badge.lay { background: #005EA6; color: #fff; }
+.last { margin: 6px auto 0; text-align: center; font-size: 10px; font-weight: 700; color: #000; background: #A1A1A1; display: inline-block; padding: 3px 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+
+/* Score badges next to team names */
+.score-badge { background: #2B2B2B; border-radius: 6px; padding: 6px 1px; font-weight: 700; font-size: 18px; min-width: 24px; text-align: center; justify-self: start; }
+.score-badge.empty { background: transparent; color: transparent; border: 1px solid transparent; }
+
+/* Place actions without affecting teams width */
+.actions { position: absolute; right: 12px; top: 12px; }
+.icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; border-radius: 4px; }
+.icon { width: 22px; height: 22px; fill: transparent; stroke: #FFFFFF; stroke-width: 2; transition: fill 120ms ease, stroke 120ms ease, transform 120ms ease; }
+.icon-btn:hover .icon, .icon-btn:active .icon { fill: #FFFFFF; }
+.icon-btn.remove:hover .icon, .icon-btn.remove:active .icon { fill: #db3625; stroke: #db3625; }
+.icon-btn.maybe.active .icon, .icon-btn.maybe:hover .icon, .icon-btn.maybe:active .icon { fill: #EAC924; stroke: #EAC924; }
+.icon-btn.bet.active .icon, .icon-btn.bet:hover .icon, .icon-btn.bet:active .icon { fill: #141414; stroke: #005EA6; }
+
+/* Layout: row on desktop; grid for icons on mobile */
+@media (min-width: 901px) {
+	.actions { display: flex; gap: 0px; }
+}
+@media (max-width: 900px) {
+	.actions { display: grid; grid-template-columns: repeat(3, 28px); gap: 0px; }
+}
+/* Confidence score badge next to actions */
+.confidence-badge { display: inline-block; border-radius: 6px; padding: 4px 6px; font-weight: 700; font-size: 12px; min-width: 32px; text-align: center; color: #fff; }
+.confidence-green { background: #00B073; }
+.confidence-yellow { background: #EAC924; color: #000; }
+.confidence-amber { background: #FF8C00; }
+.confidence-red { background: #db3625; }
+@media (min-width: 901px) {
+	.actions .confidence-badge { order: -1; margin-right: 8px; align-self: center; }
+}
+@media (max-width: 900px) {
+	.actions .confidence-badge { grid-column: 1 / span 3; grid-row: 2; justify-self: end; margin-top: 4px; }
+}
+
+/* Responsive widths: full width on mobile, constrained on larger screens */
+@media (min-width: 901px) {
+	.cards { align-items: center; }
+	.card { max-width: 850px; }
+}
+
+/* Toast notification */
+.toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: #1f1f1f; color: #fff; border: 1px solid #333; box-shadow: 0 4px 12px rgba(0,0,0,0.4); padding: 10px 12px; border-radius: 6px; display: flex; align-items: center; gap: 12px; z-index: 1000; }
+.toast-text { font-weight: 600; }
+.toast-actions { display: flex; gap: 8px; }
+.toast-btn { background: #00B073; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; font-weight: 700; cursor: pointer; }
+.toast-btn.secondary { background: #005EA6; }
+@media (max-width: 900px) {
+	.toast { left: 12px; right: 12px; transform: none; justify-content: space-between; }
+}
+
+/* Analysis panel */
+.analysis-toggle { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+/* Default buttons (used in cards): previous height restored */
+.analysis-btn { background: #2b2b2b; color: #fff; border: 1px solid #3a3a3a; border-radius: 4px; font-weight: 700; cursor: pointer; display: inline-block; text-decoration: none; font-size: 14px; line-height: 1; padding: 6px 10px; box-sizing: border-box; }
+/* Top toolbar (Date + view mode) — match select height */
+.cards > .analysis-toggle .analysis-btn { display: inline-flex; align-items: center; padding: 0 12px; height: 28px; }
+.cards > .analysis-toggle select.analysis-btn { height: 28px; padding: 0 12px; line-height: normal; }
+/* Ensure card buttons align text consistently and match 28px height */
+.card .analysis-toggle .analysis-btn { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; }
+.analysis-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.analysis-toggle a.analysis-btn { text-decoration: none; }
+.analysis-toggle a.analysis-btn:hover { text-decoration: none; }
+.analysis-btn:hover { background: #3a3a3a; }
+.analysis-panel { margin-top: 6px; padding: 6px; border: 1px solid #0f0f0f; border-radius: 4px; background: #0f0f0f; }
+/*.analysis-panel-two { margin-top: 6px; padding: 6px; border: 1px solid #0f0f0f; border-radius: 4px; background: #0f0f0f; }*/
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stats-col { background: #141414; padding: 6px; border-radius: 4px; }
+.stats-title { font-weight: 700; margin-bottom: 6px; }
+.stats-subtitle { font-size: 14px; font-weight: 600; margin-bottom: 0px; }
+.stat { font-size: 13px; color: #cfcfcf; margin: 4px 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+/* Center the two action buttons on mobile within each card */
+@media (max-width: 900px) {
+	.card .analysis-toggle { justify-content: center; }
+}
+
+/* Empty-state message when no matches to show */
+.empty-state { text-align: center; color: #b0b0b0; font-weight: 700; padding: 12px 0; }
