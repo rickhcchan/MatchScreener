@@ -38,9 +38,28 @@ def previous_season_code(today: Optional[datetime] = None) -> Tuple[str, int, in
     return code, start_year, end_year
 
 def try_fetch_excel_all_sheets(url: str) -> Optional[pd.DataFrame]:
-    resp = requests.get(url, timeout=30)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    }
+    resp = requests.get(url, timeout=30, headers=headers, allow_redirects=False)
+    
+    # If it's a redirect, follow it once to get the actual file
+    if resp.status_code in (301, 302, 303, 307, 308):
+        # Don't follow Office viewer redirects, get the file directly
+        if 'officeapps.live.com' in resp.headers.get('Location', ''):
+            # Re-request with headers that force download
+            resp = requests.get(url, timeout=30, headers=headers)
+        else:
+            resp = requests.get(resp.headers.get('Location'), timeout=30, headers=headers)
+    
     if resp.status_code != 200:
         return None
+    
+    # Check if we got HTML instead of Excel
+    content_type = resp.headers.get('Content-Type', '').lower()
+    if 'html' in content_type:
+        return None
+        
     content = io.BytesIO(resp.content)
     try:
         sheets = pd.read_excel(content, sheet_name=None)
@@ -164,5 +183,6 @@ def build_merged_dataset(today: Optional[datetime] = None) -> pd.DataFrame:
     latest_n = load_and_normalize(latest) if not latest.empty else pd.DataFrame()
     merged_cur = dedupe_merge(cur_n, latest_n) if not cur_n.empty else latest_n
     all_merged = pd.concat([merged_cur, prev_n], ignore_index=True)
-    all_merged.sort_values(by=["date"], inplace=True)
+    if not all_merged.empty and "date" in all_merged.columns:
+        all_merged.sort_values(by=["date"], inplace=True)
     return all_merged

@@ -19,7 +19,13 @@ venv/
 # Data and artifacts
 *.parquet
 matches.parquet
+*.csv
+matches.csv
 /data/
+
+# Generation scripts
+generate_compatible_parquet.py
+generate_csv.py
 
 # OS junk
 .DS_Store

@@ -19,7 +19,7 @@ _DATASET: DatasetCache = DatasetCache()
 
 def load_dataset(data_path: str) -> pd.DataFrame:
     """
-    Load cached dataset if unchanged, otherwise read from Parquet. If not found, return empty DataFrame.
+    Load cached dataset if unchanged, otherwise read from Parquet, CSV, or compressed CSV. If not found, return empty DataFrame.
     """
     try:
         st = os.stat(data_path)
@@ -28,7 +28,13 @@ def load_dataset(data_path: str) -> pd.DataFrame:
     if _DATASET.df is not None and _DATASET.mtime == st.st_mtime:
         return _DATASET.df
     try:
-        df = pd.read_parquet(data_path)
+        # Support parquet, csv, and compressed csv
+        if data_path.endswith('.csv.gz'):
+            df = pd.read_csv(data_path, compression='gzip')
+        elif data_path.endswith('.csv'):
+            df = pd.read_csv(data_path)
+        else:
+            df = pd.read_parquet(data_path)
     except Exception:
         return pd.DataFrame()
     _DATASET.df = df
