@@ -582,5 +582,45 @@ def api_admin_export(format: str = "csv", div: Optional[str] = None, authorizati
     else:
         raise HTTPException(status_code=400, detail="Unsupported format. Use format=csv or format=xlsx")
 
+
+@APP.get("/api/verify-data")
+def verify_data():
+    """
+    Verification endpoint to check if the data file is accessible.
+    Returns the DATA_PATH env variable, file existence status, and sample rows.
+    """
+    import os
+    
+    response = {
+        "data_path_env": DATA_PATH,
+        "file_exists": os.path.exists(DATA_PATH),
+        "file_size_bytes": None,
+        "sample_rows": [],
+        "total_rows": 0,
+        "columns": [],
+    }
+    
+    if os.path.exists(DATA_PATH):
+        try:
+            response["file_size_bytes"] = os.path.getsize(DATA_PATH)
+        except Exception as e:
+            response["file_size_error"] = str(e)
+        
+        try:
+            df = load_dataset(DATA_PATH)
+            response["total_rows"] = len(df)
+            response["columns"] = list(df.columns)
+            
+            # Get first 5 rows as sample
+            if len(df) > 0:
+                sample_df = df.head(5)
+                # Convert to dict records for JSON serialization
+                response["sample_rows"] = sample_df.to_dict(orient="records")
+        except Exception as e:
+            response["load_error"] = str(e)
+    
+    return response
+
+
 # Mount static last to avoid intercepting API routes
 APP.mount("/", StaticFiles(directory="web", html=True), name="static")
