@@ -35,7 +35,7 @@ _ODDS_TTL_SECS: int = 5
 _QUOTES_TTL_SECS: int = 2
 _ANALYTICS_TTL_SECS: int = 2
 
-DATA_PATH = os.environ.get("DATA_PATH", "/data/matches.parquet")
+DATA_PATH = os.environ.get("DATA_PATH", "data/matches_v1.parquet")
 REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "")
 
 def _check_authorization(authorization: Optional[str]):
@@ -587,9 +587,10 @@ def api_admin_export(format: str = "csv", div: Optional[str] = None, authorizati
 def verify_data():
     """
     Verification endpoint to check if the data file is accessible.
-    Returns the DATA_PATH env variable, file existence status, and sample rows.
+    Returns detailed diagnostics for troubleshooting.
     """
     import os
+    import sys
     
     response = {
         "data_path_env": DATA_PATH,
@@ -598,29 +599,78 @@ def verify_data():
         "sample_rows": [],
         "total_rows": 0,
         "columns": [],
+        "python_version": sys.version,
+        "pandas_version": pd.__version__,
     }
+    
+    # Try to get pyarrow version if available
+    try:
+        import pyarrow as pa
+        response["pyarrow_version"] = pa.__version__
+    except ImportError:
+        response["pyarrow_version"] = "not installed"
     
     if os.path.exists(DATA_PATH):
         try:
             response["file_size_bytes"] = os.path.getsize(DATA_PATH)
+            response["file_size_kb"] = round(response["file_size_bytes"] / 1024, 1)
         except Exception as e:
             response["file_size_error"] = str(e)
         
-        # Use load_dataset which handles parquet, csv, and csv.gz
+        # Detect file type
+        if DATA_PATH.endswith('.csv.gz'):
+            response["file_type"] = "CSV (gzip compressed)"
+        elif DATA_PATH.endswith('.csv'):
+            response["file_type"] = "CSV"
+        elif DATA_PATH.endswith('.parquet'):
+            response["file_type"] = "Parquet"
+        else:
+            response["file_type"] = "Unknown"
+        
+        # Try loading with load_dataset
         try:
             df = load_dataset(DATA_PATH)
             response["total_rows"] = len(df)
             response["columns"] = list(df.columns)
             response["read_success"] = True
             
-            # Get first 5 rows as sample
             if len(df) > 0:
-                sample_df = df.head(5)
-                # Convert to dict records for JSON serialization
+                # Get first 3 rows as sample
+                sample_df = df.head(3)
                 response["sample_rows"] = sample_df.to_dict(orient="records")
+                
+                # Add some data quality checks
+                response["data_quality"] = {
+                    "has_date_column": "date" in df.columns,
+                    "has_team_columns": "home_norm" in df.columns and "away_norm" in df.columns,
+                    "date_range": None,
+                }
+                
+                if "date" in df.columns:
+                    try:
+                        response["data_quality"]["date_range"] = {
+                            "min": str(df["date"].min()),
+                            "max": str(df["date"].max()),
+                        }
+                    except Exception:
+                        pass
+            else:
+                response["warning"] = "File loaded but contains 0 rows"
+                
         except Exception as e:
             response["read_error"] = str(e)
             response["read_success"] = False
+            import traceback
+            response["traceback"] = traceback.format_exc()
+    else:
+        response["error"] = f"File not found at {DATA_PATH}"
+        # List available data files
+        try:
+            if os.path.exists("data"):
+                files = os.listdir("data")
+                response["available_data_files"] = [f for f in files if f.endswith(('.parquet', '.csv', '.csv.gz'))]
+        except Exception:
+            pass
     
     return response
 
