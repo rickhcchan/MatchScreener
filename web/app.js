@@ -128,6 +128,8 @@ function EventsTable() {
           if (e.correct_score_any_other_home_win_contract_id) cids.push(String(e.correct_score_any_other_home_win_contract_id));
           if (e.correct_score_any_other_away_win_contract_id) cids.push(String(e.correct_score_any_other_away_win_contract_id));
           if (e.correct_score_any_other_draw_contract_id) cids.push(String(e.correct_score_any_other_draw_contract_id));
+          if (e.over_under_45_market_id) mids.push(String(e.over_under_45_market_id));
+          if (e.over_45_contract_id) cids.push(String(e.over_45_contract_id));
         });
         marketIdsRef.current = Array.from(new Set(mids));
         contractIdsRef.current = Array.from(new Set(cids));
@@ -248,6 +250,8 @@ function EventsTable() {
       if (e.correct_score_any_other_home_win_contract_id) cids.push(String(e.correct_score_any_other_home_win_contract_id));
       if (e.correct_score_any_other_away_win_contract_id) cids.push(String(e.correct_score_any_other_away_win_contract_id));
       if (e.correct_score_any_other_draw_contract_id) cids.push(String(e.correct_score_any_other_draw_contract_id));
+      if (e.over_under_45_market_id) mids.push(String(e.over_under_45_market_id));
+      if (e.over_under_45_contract_over_id) cids.push(String(e.over_under_45_contract_over_id));
     });
     eventsRef.current = state.data.events || [];
     marketIdsRef.current = Array.from(new Set(mids));
@@ -535,13 +539,14 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
 
   const wm = e.winner_market_id ? String(e.winner_market_id) : null;
   const cs = e.correct_score_market_id ? String(e.correct_score_market_id) : null;
-  const ou = e.over_under_0_5_market_id ? String(e.over_under_0_5_market_id) : null;
+  const ou45 = e.over_under_45_market_id ? String(e.over_under_45_market_id) : null;
   const homeOdds = oddsFor(wm, e.winner_contract_home_id ? String(e.winner_contract_home_id) : null);
   const drawOdds = oddsFor(wm, e.winner_contract_draw_id ? String(e.winner_contract_draw_id) : null);
   const awayOdds = oddsFor(wm, e.winner_contract_away_id ? String(e.winner_contract_away_id) : null);
   const anyHomeOdds = oddsFor(cs, e.correct_score_any_other_home_win_contract_id ? String(e.correct_score_any_other_home_win_contract_id) : null);
   const anyAwayOdds = oddsFor(cs, e.correct_score_any_other_away_win_contract_id ? String(e.correct_score_any_other_away_win_contract_id) : null);
   const anyDrawOdds = oddsFor(cs, e.correct_score_any_other_draw_contract_id ? String(e.correct_score_any_other_draw_contract_id) : null);
+  const over45Odds = oddsFor(ou45, e.over_45_contract_id ? String(e.over_45_contract_id) : null);
 
   return h("div", { class: "card", ref: rootRef, 'data-eid': eid },
     h("div", { class: "actions" },
@@ -582,6 +587,7 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
       h(OddCell, { label: "Home Others", odds: anyHomeOdds }),
       h(OddCell, { label: "Draw Others", odds: anyDrawOdds }),
       h(OddCell, { label: "Away Others", odds: anyAwayOdds }),
+      h(OddCell, { label: "Over 4.5", odds: over45Odds }),
     ),
     h("div", { class: "analysis-toggle" },
       h("button", { class: "analysis-btn", onClick: onToggleExpand, disabled: !statsAvailable, title: (!statsAvailable ? "Stats not available" : "") }, statsBtnText),
@@ -658,46 +664,6 @@ function bpsToDecimal(bps) {
   return 10000 / n;
 }
 
-function formatPrices(e, oddsMap, quotesMap) {
-  const wm = e.winner_market_id ? String(e.winner_market_id) : null;
-  const cs = e.correct_score_market_id ? String(e.correct_score_market_id) : null;
-  const home = e.winner_contract_home_id ? String(e.winner_contract_home_id) : null;
-  const draw = e.winner_contract_draw_id ? String(e.winner_contract_draw_id) : null;
-  const away = e.winner_contract_away_id ? String(e.winner_contract_away_id) : null;
-  const z0 = e.correct_score_0_0_contract_id ? String(e.correct_score_0_0_contract_id) : null;
-
-  function one(marketId, contractId, label) {
-    if (!marketId || !contractId) return `${label}: -`;
-    const q = quotesMap[contractId] || null;
-    const o = oddsMap[marketId] && oddsMap[marketId][contractId] ? oddsMap[marketId][contractId] : null;
-    const ask = q && (q.best_offer_decimal ?? bpsToDecimal(q.best_offer_bps));
-    const bid = q && (q.best_bid_decimal ?? bpsToDecimal(q.best_bid_bps));
-    // Prefer backend-provided decimal; fallback only if raw value > 0
-    function fmtDec(n) {
-      if (typeof n !== 'number' || !Number.isFinite(n)) return '-';
-      return n.toFixed(2).replace(/\.00$/, '').replace(/([0-9])0$/, '$1');
-    }
-    let lastStr = "-";
-    if (o && typeof o.last_decimal === 'number') {
-      lastStr = fmtDec(o.last_decimal);
-    } else if (o && o.last_executed_price != null) {
-      const raw = parseFloat(o.last_executed_price);
-      if (Number.isFinite(raw) && raw > 0) {
-        lastStr = fmtDec(100 / raw);
-      }
-    }
-    const askStr = fmtDec(ask);
-    const bidStr = fmtDec(bid);
-    return `${label} B:${askStr} L:${bidStr} LT:${lastStr}`;
-  }
-
-  const parts = [];
-  parts.push(one(wm, home, "H"));
-  parts.push(one(wm, draw, "D"));
-  parts.push(one(wm, away, "A"));
-  parts.push(one(cs, z0, "0-0"));
-  return parts.join(" | ");
-}
 function AnalysisPanel({ insights }) {
   if (!insights || !insights.home || !insights.away) {
     return h("div", { class: "analysis-panel" }, h("div", { class: "small" }, ""));
