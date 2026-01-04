@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 # Minimal league slug → football-data Div code mapping.
 # Please expand/adjust as needed.
@@ -49,7 +50,7 @@ SLUG_TO_DIV = {
     "greece-super-league": "G1",
 }
 
-def resolve_div_from_slug(full_slug: str | None) -> str | None:
+def resolve_div_from_slug(full_slug: Optional[str]) -> Optional[str]:
     if not full_slug:
         return None
     s = full_slug.lower()

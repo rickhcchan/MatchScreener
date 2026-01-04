@@ -61,7 +61,7 @@ def refresh(authorization: Optional[str] = Header(default=None)):
 _EVENTS_CACHE: Dict[str, Dict[str, Any]] = {}
 
 @APP.get("/api/events")
-def api_events(day: str | None = None):
+def api_events(day: Optional[str] = None):
     try:
         # Cache key based on query params
         key = f"day:{day or '*'}"
@@ -253,7 +253,7 @@ _QUOTES_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
 @APP.get("/api/odds")
-def api_odds(market_ids: str, contract_ids: str | None = None):
+def api_odds(market_ids: str, contract_ids: Optional[str] = None):
     """
     Returns last executed prices for the provided market IDs (≤100 per batch).
     Optionally filters to the provided contract IDs.
