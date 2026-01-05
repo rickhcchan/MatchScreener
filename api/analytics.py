@@ -19,7 +19,7 @@ _DATASET: DatasetCache = DatasetCache()
 
 def load_dataset(data_path: str) -> pd.DataFrame:
     """
-    Load cached dataset if unchanged, otherwise read from Parquet, CSV, or compressed CSV. If not found, return empty DataFrame.
+    Load cached dataset if unchanged, otherwise read from Parquet. If not found, return empty DataFrame.
     """
     try:
         st = os.stat(data_path)
@@ -28,13 +28,7 @@ def load_dataset(data_path: str) -> pd.DataFrame:
     if _DATASET.df is not None and _DATASET.mtime == st.st_mtime:
         return _DATASET.df
     try:
-        # Support parquet, csv, and compressed csv
-        if data_path.endswith('.csv.gz'):
-            df = pd.read_csv(data_path, compression='gzip')
-        elif data_path.endswith('.csv'):
-            df = pd.read_csv(data_path)
-        else:
-            df = pd.read_parquet(data_path)
+        df = pd.read_parquet(data_path)
     except Exception:
         return pd.DataFrame()
     _DATASET.df = df
@@ -95,9 +89,9 @@ def compute_team_stats(df: pd.DataFrame, team_norm: str, div_code: Optional[str]
             "wins_count": 0, "wins_pct": None, "wins_others_count": 0, "wins_others_pct": None,
             "draws_count": 0, "draws_pct": None, "draws_others_count": 0, "draws_others_pct": None,
             "losses_count": 0, "losses_pct": None, "losses_others_count": 0, "losses_others_pct": None,
-            # 2+ goals by venue
-            "home_scored_2plus_count": 0, "home_scored_2plus_pct": None,
-            "away_scored_2plus_count": 0, "away_scored_2plus_pct": None,
+            # 1st half 2+ goals by venue
+            "home_ht_2plus_count": 0, "home_ht_2plus_pct": None,
+            "away_ht_2plus_count": 0, "away_ht_2plus_pct": None,
         }
     # Per-row: goals for / against from team perspective, plus half splits where available
     is_home = sub["home_norm"] == team_norm
@@ -109,10 +103,13 @@ def compute_team_stats(df: pd.DataFrame, team_norm: str, div_code: Optional[str]
         hthg = hthg.astype(float)
         htag = htag.astype(float)
         gf_ht = (hthg.where(is_home, htag))
+        ga_ht = (htag.where(is_home, hthg))
         gf_2h = (gf - gf_ht).clip(lower=0)
         total_gf = gf.sum()
         share_gf_2h = float(gf_2h.sum() / total_gf) if total_gf > 0 else None
     else:
+        gf_ht = None
+        ga_ht = None
         share_gf_2h = None
 
     total_goals = (sub["FTHG"].astype(float) + sub["FTAG"].astype(float))
@@ -179,11 +176,22 @@ def compute_team_stats(df: pd.DataFrame, team_norm: str, div_code: Optional[str]
         "wins_count": wins_count, "wins_pct": _pct(wins_count), "wins_others_count": wins_others_count, "wins_others_pct": _pct(wins_others_count),
         "draws_count": draws_count, "draws_pct": _pct(draws_count), "draws_others_count": draws_others_count, "draws_others_pct": _pct(draws_others_count),
         "losses_count": losses_count, "losses_pct": _pct(losses_count), "losses_others_count": losses_others_count, "losses_others_pct": _pct(losses_others_count),
-        # New: 2+ goals by venue (percent denominator = matches at that venue)
-        "home_scored_2plus_count": int(((is_home) & (gf >= 2)).sum()),
-        "home_scored_2plus_pct": (float(((is_home) & (gf >= 2)).sum()) / float(int(is_home.sum())) if int(is_home.sum()) > 0 else None),
-        "away_scored_2plus_count": int(((~is_home) & (gf >= 2)).sum()),
-        "away_scored_2plus_pct": (float(((~is_home) & (gf >= 2)).sum()) / float(int((~is_home).sum())) if int((~is_home).sum()) > 0 else None),
+        # 1st half 2+ goals scored by venue
+        "home_ht_2plus_count": int(((is_home) & (gf_ht >= 2)).sum()) if gf_ht is not None else 0,
+        "home_ht_2plus_pct": (float(((is_home) & (gf_ht >= 2)).sum()) / float(int(is_home.sum())) if gf_ht is not None and int(is_home.sum()) > 0 else None),
+        "away_ht_2plus_count": int(((~is_home) & (gf_ht >= 2)).sum()) if gf_ht is not None else 0,
+        "away_ht_2plus_pct": (float(((~is_home) & (gf_ht >= 2)).sum()) / float(int((~is_home).sum())) if gf_ht is not None and int((~is_home).sum()) > 0 else None),
+        # 1st half 2+ goals conceded by venue
+        "home_ht_2plus_conceded_count": int(((is_home) & (ga_ht >= 2)).sum()) if ga_ht is not None else 0,
+        "home_ht_2plus_conceded_pct": (float(((is_home) & (ga_ht >= 2)).sum()) / float(int(is_home.sum())) if ga_ht is not None and int(is_home.sum()) > 0 else None),
+        "away_ht_2plus_conceded_count": int(((~is_home) & (ga_ht >= 2)).sum()) if ga_ht is not None else 0,
+        "away_ht_2plus_conceded_pct": (float(((~is_home) & (ga_ht >= 2)).sum()) / float(int((~is_home).sum())) if ga_ht is not None and int((~is_home).sum()) > 0 else None),
+        # Conditional: HT 2+ scored → Win Others, HT 2+ conceded → Lost Others
+        "ht_2plus_to_win_others_pct": (float(((gf_ht >= 2) & wins_others_mask).sum()) / float(int((gf_ht >= 2).sum())) if gf_ht is not None and int((gf_ht >= 2).sum()) > 0 else None),
+        "ht_2plus_conceded_to_lost_others_pct": (float(((ga_ht >= 2) & losses_others_mask).sum()) / float(int((ga_ht >= 2).sum())) if ga_ht is not None and int((ga_ht >= 2).sum()) > 0 else None),
+        # Conditional by venue: HT 2+ conceded → Lost Others
+        "home_ht_2plus_conceded_to_lost_others_pct": (float(((is_home) & (ga_ht >= 2) & losses_others_mask).sum()) / float(int(((is_home) & (ga_ht >= 2)).sum())) if ga_ht is not None and int(((is_home) & (ga_ht >= 2)).sum()) > 0 else None),
+        "away_ht_2plus_conceded_to_lost_others_pct": (float(((~is_home) & (ga_ht >= 2) & losses_others_mask).sum()) / float(int(((~is_home) & (ga_ht >= 2)).sum())) if ga_ht is not None and int(((~is_home) & (ga_ht >= 2)).sum()) > 0 else None),
         # Optional debug examples
         **({
             "wins_others_examples": wins_others_examples,
@@ -284,6 +292,18 @@ def compute_league_overview(
     total_goals = (FTHG + FTAG)
     zero_zero = (total_goals == 0).sum()
 
+    # Half-time goals
+    hthg = sub.get("HTHG")
+    htag = sub.get("HTAG")
+    if hthg is not None and htag is not None:
+        HTHG = hthg.astype(float)
+        HTAG = htag.astype(float)
+        home_ht_2plus_pct = float((HTHG >= 2).mean()) if len(sub) > 0 else None
+        away_ht_2plus_pct = float((HTAG >= 2).mean()) if len(sub) > 0 else None
+    else:
+        home_ht_2plus_pct = None
+        away_ht_2plus_pct = None
+
     # Venue-scoped rates
     home_scored_2plus_pct = float((FTHG >= 2).mean()) if len(sub) > 0 else None
     away_scored_2plus_pct = float((FTAG >= 2).mean()) if len(sub) > 0 else None
@@ -315,6 +335,8 @@ def compute_league_overview(
         "avg_goals_away": float(FTAG.mean()),
         "home_scored_2plus_pct": home_scored_2plus_pct,
         "away_scored_2plus_pct": away_scored_2plus_pct,
+        "home_ht_2plus_pct": home_ht_2plus_pct,
+        "away_ht_2plus_pct": away_ht_2plus_pct,
         "home_win_count": home_win_count, "home_win_pct": _pct(home_win_count),
         "home_win_others_count": home_win_others_count, "home_win_others_pct": _pct(home_win_others_count),
         "draw_count": draw_count, "draw_pct": _pct(draw_count),

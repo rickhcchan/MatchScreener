@@ -186,3 +186,11 @@ def build_merged_dataset(today: Optional[datetime] = None) -> pd.DataFrame:
     if not all_merged.empty and "date" in all_merged.columns:
         all_merged.sort_values(by=["date"], inplace=True)
     return all_merged
+
+if __name__ == "__main__":
+    print("Fetching and building dataset...")
+    df = build_merged_dataset()
+    out_path = os.environ.get("DATA_PATH", "data/matches_v1.parquet")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    df.to_parquet(out_path, index=False)
+    print(f"Done. Saved {len(df)} rows to {out_path}")

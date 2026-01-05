@@ -16,6 +16,8 @@ TEAM_ALIASES: dict[str, str] = {
     "salford city": "salford",
     "man utd": "man united",
     "wolverhampton": "wolves",
+    "usl dunkerque": "dunkerque",
+    "aris thessaloniki": "aris",
 }
 
 

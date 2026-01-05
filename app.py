@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import pandas as pd
 
-from src.matchscreener.fetch_football_data import build_merged_dataset
-from src.matchscreener.smarkets_api import (
+from api.fetch_football_data import build_merged_dataset
+from api.smarkets_api import (
     fetch_events,
     enrich_events_with_competitors,
     fetch_event_detail,
@@ -19,7 +19,7 @@ from src.matchscreener.smarkets_api import (
     fetch_last_executed_prices,
     fetch_quotes,
 )
-from src.matchscreener.analytics import (
+from api.analytics import (
     load_dataset,
     build_match_insights,
 )
@@ -448,7 +448,7 @@ def api_match_insights(ids: str, debug_examples: bool = False):
                 out.append({"event_id": eid, "insights": None, "note": "missing teams or dataset"})
                 continue
             try:
-                from src.matchscreener.fetch_football_data import normalize_team_name
+                from api.fetch_football_data import normalize_team_name
                 home_norm = normalize_team_name(str(home))
                 away_norm = normalize_team_name(str(away))
             except Exception:
