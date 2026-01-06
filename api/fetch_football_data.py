@@ -11,6 +11,10 @@ BASE_SEASON_URL = "https://www.football-data.co.uk/mmz4281/{season_code}/all-eur
 LATEST_RESULTS_URL = "https://www.football-data.co.uk/mmz4281/{season_code}/Latest_Results.xlsx"
 DOWNLOAD_PAGE = "https://www.football-data.co.uk/downloadm.php"
 
+# World leagues URLs (new structure)
+WORLD_SEASON_URL = "https://www.football-data.co.uk/new/new_leagues_data.xlsx"
+WORLD_LATEST_URL = "https://www.football-data.co.uk/new/Latest_Results.xlsx"
+
 def normalize_team_name(name: str) -> str:
     s = str(name).lower().strip()
     for k, v in {"&": "and", "-": " ", "/": " ", "'": "", ".": ""}.items():
@@ -140,6 +144,8 @@ def load_and_normalize(df: pd.DataFrame) -> pd.DataFrame:
     out["away_norm"] = out["away"].apply(normalize_team_name)
     out["league_norm"] = out["league"].str.lower().str.strip()
     out = out.dropna(subset=["date", "HomeTeam", "AwayTeam"])  # ensure core fields
+    # Mark Europe leagues as having half-time data
+    out["has_half_time_data"] = True
     return out
 
 def dedupe_merge(base: pd.DataFrame, overlay: pd.DataFrame) -> pd.DataFrame:
@@ -176,13 +182,126 @@ def fetch_season_dataset(today: Optional[datetime] = None) -> Tuple[pd.DataFrame
         df_current = pd.DataFrame()
     return df_current, df_previous, df_latest
 
+def load_and_normalize_world(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize world leagues data (Country_League format, no half-time data)"""
+    # Make a copy to avoid SettingWithCopyWarning
+    df = df.copy()
+    
+    cols = {c.lower(): c for c in df.columns}
+    def find(name_opts: List[str]) -> Optional[str]:
+        for n in name_opts:
+            if n in cols:
+                return cols[n]
+        return None
+    
+    # Clean Country and League (strip trailing spaces)
+    if "Country" in df.columns:
+        df["Country"] = df["Country"].astype(str).str.strip()
+    if "League" in df.columns:
+        df["League"] = df["League"].astype(str).str.strip()
+    
+    date_col = find(["date", "match date"]) or "Date"
+    time_col = find(["time", "ko time"]) or "Time"
+    home_col = find(["home"]) or "Home"
+    away_col = find(["away"]) or "Away"
+    hg_col = find(["hg", "home goals"]) or "HG"
+    ag_col = find(["ag", "away goals"]) or "AG"
+    country_col = find(["country"]) or "Country"
+    league_col = find(["league"]) or "League"
+    
+    out = pd.DataFrame()
+    # Create composite Div as "Country_League"
+    country = df.get(country_col, pd.Series([""] * len(df))).astype(str).str.strip()
+    league = df.get(league_col, pd.Series([""] * len(df))).astype(str).str.strip()
+    out["Div"] = country + "_" + league
+    
+    out["Date"] = df.get(date_col)
+    out["Time"] = df.get(time_col)
+    out["HomeTeam"] = df.get(home_col)
+    out["AwayTeam"] = df.get(away_col)
+    out["FTHG"] = df.get(hg_col)
+    out["FTAG"] = df.get(ag_col)
+    out["HTHG"] = None  # No half-time data
+    out["HTAG"] = None
+    
+    # Odds (same columns as Europe)
+    for col in ["BFH","BFD","BFA","BFCH","BFCD","BFCA"]:
+        out[col] = None  # World leagues don't have these specific odds
+    
+    # Stats (world leagues have different odd columns, set to None)
+    for col in [
+        "HS","AS","HST","AST","HHW","AHW","HC","AC","HF","AF",
+        "HFKC","AFKC","HO","AO","HY","AY","HR","AR","HBP","ABP",
+    ]:
+        out[col] = None
+    
+    # Normalized helpers
+    out["date"] = pd.to_datetime(out["Date"], dayfirst=True, errors="coerce")
+    out["home"] = out["HomeTeam"].astype(str)
+    out["away"] = out["AwayTeam"].astype(str)
+    out["league"] = out["Div"].astype(str)
+    out["home_goals"] = pd.to_numeric(out["FTHG"], errors="coerce")
+    out["away_goals"] = pd.to_numeric(out["FTAG"], errors="coerce")
+    out["home_norm"] = out["home"].apply(normalize_team_name)
+    out["away_norm"] = out["away"].apply(normalize_team_name)
+    # Normalize Div to match Smarkets format: country-league
+    out["league_norm"] = out["Div"].str.lower().str.replace("_", "-").str.replace(" ", "-")
+    out = out.dropna(subset=["date", "HomeTeam", "AwayTeam"])
+    # Mark world leagues as NOT having half-time data
+    out["has_half_time_data"] = False
+    return out
+
+def fetch_world_season_dataset() -> pd.DataFrame:
+    """Fetch world leagues data, taking latest 2 seasons per league"""
+    df_season = try_fetch_excel_all_sheets(WORLD_SEASON_URL)
+    if df_season is None or df_season.empty:
+        return pd.DataFrame()
+    
+    df_latest = try_fetch_excel_all_sheets(WORLD_LATEST_URL)
+    
+    # Process season data: group by Country+League and take latest 2 seasons
+    df_season["Country"] = df_season["Country"].astype(str).str.strip()
+    df_season["League"] = df_season["League"].astype(str).str.strip()
+    df_season["Season"] = df_season["Season"].astype(str).str.strip()
+    
+    # Group by league and get latest 2 seasons - use list comprehension instead of apply
+    filtered_dfs = []
+    for (country, league), group in df_season.groupby(["Country", "League"]):
+        unique_seasons = sorted(group["Season"].unique(), reverse=True)
+        latest_2 = unique_seasons[:2]
+        filtered_group = group[group["Season"].isin(latest_2)]
+        filtered_dfs.append(filtered_group)
+    
+    df_filtered = pd.concat(filtered_dfs, ignore_index=True) if filtered_dfs else pd.DataFrame()
+    
+    # Normalize both
+    season_normalized = load_and_normalize_world(df_filtered) if not df_filtered.empty else pd.DataFrame()
+    latest_normalized = load_and_normalize_world(df_latest) if df_latest is not None and not df_latest.empty else pd.DataFrame()
+    
+    # Merge with dedup (latest takes precedence)
+    if not season_normalized.empty and not latest_normalized.empty:
+        return dedupe_merge(season_normalized, latest_normalized)
+    elif not season_normalized.empty:
+        return season_normalized
+    else:
+        return latest_normalized
+
 def build_merged_dataset(today: Optional[datetime] = None) -> pd.DataFrame:
+    """Build merged dataset from both Europe and World leagues"""
+    # Fetch Europe leagues
     cur, prev, latest = fetch_season_dataset(today)
     cur_n = load_and_normalize(cur) if not cur.empty else pd.DataFrame()
     prev_n = load_and_normalize(prev) if not prev.empty else pd.DataFrame()
     latest_n = load_and_normalize(latest) if not latest.empty else pd.DataFrame()
     merged_cur = dedupe_merge(cur_n, latest_n) if not cur_n.empty else latest_n
-    all_merged = pd.concat([merged_cur, prev_n], ignore_index=True)
+    europe_merged = pd.concat([merged_cur, prev_n], ignore_index=True)
+    
+    # Fetch World leagues
+    world_merged = fetch_world_season_dataset()
+    
+    # Combine both
+    all_merged = pd.concat([europe_merged, world_merged], ignore_index=True)
+    
     if not all_merged.empty and "date" in all_merged.columns:
         all_merged.sort_values(by=["date"], inplace=True)
     return all_merged

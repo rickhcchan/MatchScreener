@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 # Minimal league slug → football-data Div code mapping.
-# Please expand/adjust as needed.
+# Europe leagues use short codes (E0, I1, etc.)
+# World leagues use Country_League format
 SLUG_TO_DIV = {
     # England
     "england-premier-league": "E0",
@@ -48,6 +49,56 @@ SLUG_TO_DIV = {
 
     # Greece
     "greece-super-league": "G1",
+    
+    # World Leagues (Country_League format)
+    # Argentina
+    "argentina-torneo-de-la-liga-profesional": "Argentina_Torneo De La Liga Profesional",
+    "argentina-copa-de-la-liga-profesional": "Argentina_Copa De La Liga Profesional",
+    
+    # Austria
+    "austria-bundesliga": "Austria_Bundesliga",
+    
+    # Brazil
+    "brazil-serie-a": "Brazil_Serie A",
+    
+    # China
+    "china-super-league": "China_Super League",
+    
+    # Denmark
+    "denmark-superliga": "Denmark_Superliga",
+    
+    # Finland
+    "finland-veikkausliiga": "Finland_Veikkausliiga",
+    
+    # Ireland
+    "ireland-premier-division": "Ireland_Premier Division",
+    
+    # Japan
+    "japan-j1-league": "Japan_J1 League",
+    
+    # Mexico
+    "mexico-liga-mx": "Mexico_Liga MX",
+    
+    # Norway
+    "norway-eliteserien": "Norway_Eliteserien",
+    
+    # Poland
+    "poland-ekstraklasa": "Poland_Ekstraklasa",
+    
+    # Romania
+    "romania-superliga": "Romania_Superliga",
+    
+    # Russia
+    "russia-premier-league": "Russia_Premier League",
+    
+    # Sweden
+    "sweden-allsvenskan": "Sweden_Allsvenskan",
+    
+    # Switzerland
+    "switzerland-super-league": "Switzerland_Super League",
+    
+    # USA
+    "usa-mls": "USA_MLS",
 }
 
 def resolve_div_from_slug(full_slug: Optional[str]) -> Optional[str]:

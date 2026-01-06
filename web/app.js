@@ -702,30 +702,33 @@ function AnalysisPanel({ insights }) {
             " / ",
             h("strong", {}, (typeof home.losses_others_pct === 'number' ? percent(home.losses_others_pct) : '-')),
           ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⚽ (H / A): ",
-            h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⚽ → Win 4+ (H / A): ",
-            h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⛔ (H / A): ",
-            h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⛔ → Lost 4+ (H / A): ",
-            h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof home.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
-          ]),
+          // Only show HT stats if they exist
+          ...(typeof home.home_ht_2plus_pct === 'number' || typeof home.away_ht_2plus_pct === 'number' ? [
+            h("div", { class: "stat" }, [
+              "HT 2+ ⚽ (H / A): ",
+              h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⛔ (H / A): ",
+              h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
+            ]),
+          ] : []),
         ] : [
           h("div", { class: "stat small" }, "Stats not available"),
         ])
@@ -747,30 +750,33 @@ function AnalysisPanel({ insights }) {
             " / ",
             h("strong", {}, (typeof away.losses_others_pct === 'number' ? percent(away.losses_others_pct) : '-')),
           ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⚽ (H / A): ",
-            h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⚽ → Win 4+ (H / A): ",
-            h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⛔ (H / A): ",
-            h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-')),
-          ]),
-          h("div", { class: "stat" }, [
-            "HT 2+ ⛔ → Lost 4+ (H / A): ",
-            h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
-          ]),
+          // Only show HT stats if they exist
+          ...(typeof away.home_ht_2plus_pct === 'number' || typeof away.away_ht_2plus_pct === 'number' ? [
+            h("div", { class: "stat" }, [
+              "HT 2+ ⚽ (H / A): ",
+              h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⛔ (H / A): ",
+              h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-')),
+            ]),
+            h("div", { class: "stat" }, [
+              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
+            ]),
+          ] : []),
         ] : [
           h("div", { class: "stat small" }, "Stats not available"),
         ])
@@ -816,12 +822,15 @@ function AnalysisPanel({ insights }) {
               " / ",
               h("strong", {}, pct(bl.away_win_others_pct)),
             ]),
-            h("div", { class: "stat" }, [
-              "HT 2+ ⚽ (H / A): ",
-              h("strong", {}, pct(bl.home_ht_2plus_pct)),
-              " / ",
-              h("strong", {}, pct(bl.away_ht_2plus_pct)),
-            ]),
+            // Only show HT stats if they exist
+            ...(typeof bl.home_ht_2plus_pct === 'number' || typeof bl.away_ht_2plus_pct === 'number' ? [
+              h("div", { class: "stat" }, [
+                "HT 2+ ⚽ (H / A): ",
+                h("strong", {}, pct(bl.home_ht_2plus_pct)),
+                " / ",
+                h("strong", {}, pct(bl.away_ht_2plus_pct)),
+              ]),
+            ] : []),
           ] : [
             h("div", { class: "stat small" }, (bl.type === 'event' ? 'Event league used' : (bl.type === 'home' ? 'Latest league used (Home)' : 'Latest league used (Away)'))),
           ])
