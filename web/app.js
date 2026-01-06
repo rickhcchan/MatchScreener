@@ -834,7 +834,7 @@ function AnalysisPanel({ insights, highlightMode }) {
           h("div", { class: "stat" }, [
             "Avg ⚽ / ⛔: ",
             dim('home', 'goals_scored', h("strong", {}, home.avg_goals_scored != null ? home.avg_goals_scored.toFixed(2) : '-')),
-            dim('home', 'goals_scored', " / "),
+            " / ",
             dim('home', 'goals_conceded', h("strong", {}, home.avg_goals_conceded != null ? home.avg_goals_conceded.toFixed(2) : '-')),
           ]),
           h("div", { class: "stat" }, [
@@ -855,19 +855,19 @@ function AnalysisPanel({ insights, highlightMode }) {
               dim('home', 'ht_scored_away', h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              dim('home', 'ht_scored_win_home', "HT 2+ ⚽ → Win 4+ (H / A): "),
               dim('home', 'ht_scored_win_home', h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-'))),
               " / ",
               dim('home', 'ht_scored_win_away', h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⛔ (H / A): ",
+              dim('home', 'ht_conceded_home', "HT 2+ ⛔ (H / A): "),
               dim('home', 'ht_conceded_home', h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-'))),
               " / ",
               dim('home', 'ht_conceded_away', h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              dim('home', 'ht_conceded_lost_home', "HT 2+ ⛔ → Lost 4+ (H / A): "),
               dim('home', 'ht_conceded_lost_home', h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-'))),
               " / ",
               dim('home', 'ht_conceded_lost_away', h("strong", {}, (typeof home.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.away_ht_2plus_conceded_to_lost_others_pct) : '-'))),
@@ -885,7 +885,7 @@ function AnalysisPanel({ insights, highlightMode }) {
           h("div", { class: "stat" }, [
             "Avg ⚽ / ⛔: ",
             dim('away', 'goals_scored', h("strong", {}, away.avg_goals_scored != null ? away.avg_goals_scored.toFixed(2) : '-')),
-            dim('away', 'goals_scored', " / "),
+            " / ",
             dim('away', 'goals_conceded', h("strong", {}, away.avg_goals_conceded != null ? away.avg_goals_conceded.toFixed(2) : '-')),
           ]),
           h("div", { class: "stat" }, [
@@ -900,25 +900,25 @@ function AnalysisPanel({ insights, highlightMode }) {
           // Only show HT stats if they exist
           ...(typeof away.home_ht_2plus_pct === 'number' || typeof away.away_ht_2plus_pct === 'number' ? [
             h("div", { class: "stat" }, [
-              "HT 2+ ⚽ (H / A): ",
+              dim('away', 'ht_scored_away', "HT 2+ ⚽ (H / A): "),
               dim('away', 'ht_scored_home', h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-'))),
               " / ",
               dim('away', 'ht_scored_away', h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              dim('away', 'ht_scored_win_away', "HT 2+ ⚽ → Win 4+ (H / A): "),
               dim('away', 'ht_scored_win_home', h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-'))),
               " / ",
               dim('away', 'ht_scored_win_away', h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⛔ (H / A): ",
+              dim('away', 'ht_conceded_away', "HT 2+ ⛔ (H / A): "),
               dim('away', 'ht_conceded_home', h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-'))),
               " / ",
               dim('away', 'ht_conceded_away', h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-'))),
             ]),
             h("div", { class: "stat" }, [
-              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              dim('away', 'ht_conceded_lost_away', "HT 2+ ⛔ → Lost 4+ (H / A): "),
               dim('away', 'ht_conceded_lost_home', h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-'))),
               " / ",
               dim('away', 'ht_conceded_lost_away', h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-'))),
