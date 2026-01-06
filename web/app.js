@@ -849,7 +849,7 @@ function AnalysisPanel({ insights, highlightMode }) {
           // Only show HT stats if they exist
           ...(typeof home.home_ht_2plus_pct === 'number' || typeof home.away_ht_2plus_pct === 'number' ? [
             h("div", { class: "stat" }, [
-              "HT 2+ ⚽ (H / A): ",
+              h("span", { style: (isDimmed('home', 'ht_scored_home') && isDimmed('home', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, "HT 2+ ⚽ (H / A): "),
               dim('home', 'ht_scored_home', h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-'))),
               h("span", { style: (isDimmed('home', 'ht_scored_home') && isDimmed('home', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " / "),
               dim('home', 'ht_scored_away', h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-'))),
@@ -900,7 +900,7 @@ function AnalysisPanel({ insights, highlightMode }) {
           // Only show HT stats if they exist
           ...(typeof away.home_ht_2plus_pct === 'number' || typeof away.away_ht_2plus_pct === 'number' ? [
             h("div", { class: "stat" }, [
-              dim('away', 'ht_scored_away', "HT 2+ ⚽ (H / A): "),
+              h("span", { style: (isDimmed('away', 'ht_scored_home') && isDimmed('away', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, "HT 2+ ⚽ (H / A): "),
               dim('away', 'ht_scored_home', h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-'))),
               h("span", { style: (isDimmed('away', 'ht_scored_home') && isDimmed('away', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " / "),
               dim('away', 'ht_scored_away', h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-'))),
