@@ -18,6 +18,10 @@ TEAM_ALIASES: dict[str, str] = {
     "wolverhampton": "wolves",
     "usl dunkerque": "dunkerque",
     "aris thessaloniki": "aris",
+    "fenerbahçe": "fenerbahce",
+    "1 magdeburg": "magdeburg",
+    "nfc volos": "volos nfc",
+    "red bull salzburg": "salzburg",
 }
 
 

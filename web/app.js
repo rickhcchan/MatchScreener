@@ -450,8 +450,12 @@ function EventsTable() {
 
 function extractLeagueName(fullSlug) {
   if (!fullSlug || typeof fullSlug !== 'string') return null;
-  // Extract league slug from pattern: /sport/football/leagues/{league-slug}/...
-  const match = fullSlug.match(/\/leagues\/([^\/]+)/);
+  // Extract league slug from pattern: /sport/football/leagues/{league-slug}/... OR /sport/football/{competition-slug}/...
+  let match = fullSlug.match(/\/leagues\/([^\/]+)/);
+  if (!match) {
+    // Try direct pattern: /sport/football/{competition}/
+    match = fullSlug.match(/\/sport\/football\/([^\/]+)/);
+  }
   if (!match) return null;
   // Convert slug to friendly name: "italy-serie-a" → "Italy Serie A"
   const slug = match[1];
