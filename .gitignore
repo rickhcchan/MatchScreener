@@ -23,9 +23,6 @@ venv/
 
 # But allow the specific data files we commit to repo
 !data/matches_v1.parquet
-!data/matches_v2.parquet
-!data/matches_v3.parquet
-!data/matches.csv.gz
 
 # Generation scripts
 generate_compatible_parquet.py
