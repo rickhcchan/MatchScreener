@@ -448,6 +448,19 @@ function EventsTable() {
 // Friendly league dropdown options ("All" first)
 // HL_LEAGUE_OPTIONS removed per request
 
+function extractLeagueName(fullSlug) {
+  if (!fullSlug || typeof fullSlug !== 'string') return null;
+  // Extract league slug from pattern: /sport/football/leagues/{league-slug}/...
+  const match = fullSlug.match(/\/leagues\/([^\/]+)/);
+  if (!match) return null;
+  // Convert slug to friendly name: "italy-serie-a" → "Italy Serie A"
+  const slug = match[1];
+  return slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function formatClock(st) {
   const period = (st.match_period || "").toLowerCase();
   if (period === "half_time") return "HT";
@@ -520,6 +533,7 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
   const statsAvailable = (homeN > 0) || (awayN > 0) || (h2hN > 0);
   const hasInsights = !!insights;
   const statsBtnText = hasInsights && !statsAvailable ? "No Stats Available" : (expandedOpen ? "Hide Stats" : "View Stats");
+  const leagueName = extractLeagueName(e.full_slug);
 
   // Per-contract odds helper
   function oddsFor(marketId, contractId) {
@@ -576,7 +590,8 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
           hasScores ? h("span", { class: "score-badge home-score" }, homeSc) : h("span", { class: "score-badge empty home-score" }, ""),
           h("div", { class: "team-name away-name" }, away),
           hasScores ? h("span", { class: "score-badge away-score" }, awaySc) : h("span", { class: "score-badge empty away-score" }, ""),
-        ])
+        ]),
+        leagueName ? h("div", { class: "league-name", title: "Competition" }, leagueName) : null
       )
     ),
     h("div", { class: `status ${status.class}` }, h("span", { class: "time" }, status.text)),
