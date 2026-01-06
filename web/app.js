@@ -535,6 +535,71 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
   const statsBtnText = hasInsights && !statsAvailable ? "No Stats Available" : (expandedOpen ? "Hide Stats" : "View Stats");
   const leagueName = extractLeagueName(e.full_slug);
 
+  // Calculate Home Others and Away Others scores
+  function calculateOthersScores(insights) {
+    if (!insights || !insights.home || !insights.away) return { homeOthers: null, awayOthers: null };
+    
+    const home = insights.home;
+    const away = insights.away;
+    
+    // Helper to normalize percentages (0-1) to 0-100 scale
+    const pct = (val) => (typeof val === 'number' && Number.isFinite(val)) ? val * 100 : null;
+    
+    // Helper to normalize avg goals to 0-100 (4+ = 100, 0 = 0)
+    const goalScore = (val) => (typeof val === 'number' && Number.isFinite(val)) ? Math.min(100, (val / 4) * 100) : null;
+    
+    // Helper to average non-null values
+    const avg = (...values) => {
+      const valid = values.filter(v => v !== null && Number.isFinite(v));
+      return valid.length > 0 ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
+    };
+    
+    // HOME OTHERS SCORE
+    // Home team offensive (at home venue)
+    const homeOffensive = avg(
+      goalScore(home.avg_goals_scored),           // 25%: overall avg goals
+      pct(home.wins_others_pct),                  // 35%: win with 4+ goals
+      pct(home.home_ht_2plus_pct),                // 20%: HT 2+ at home
+      pct(home.ht_2plus_to_win_others_pct)        // 20%: HT 2+ → Win 4+
+    );
+    
+    // Away team defensive weakness (when away)
+    const awayDefensive = avg(
+      goalScore(away.avg_goals_conceded),                      // 25%: overall avg conceded
+      pct(away.losses_others_pct),                             // 35%: lose with 4+ conceded
+      pct(away.away_ht_2plus_conceded_pct),                    // 20%: HT 2+ conceded away
+      pct(away.away_ht_2plus_conceded_to_lost_others_pct)      // 20%: HT 2+ conceded → Lose 4+
+    );
+    
+    const homeOthersScore = avg(homeOffensive, awayDefensive);
+    
+    // AWAY OTHERS SCORE
+    // Away team offensive (when away)
+    const awayOffensive = avg(
+      goalScore(away.avg_goals_scored),
+      pct(away.wins_others_pct),
+      pct(away.away_ht_2plus_pct),                // at away venue
+      pct(away.ht_2plus_to_win_others_pct)
+    );
+    
+    // Home team defensive weakness (at home)
+    const homeDefensive = avg(
+      goalScore(home.avg_goals_conceded),
+      pct(home.losses_others_pct),
+      pct(home.home_ht_2plus_conceded_pct),                   // at home venue
+      pct(home.home_ht_2plus_conceded_to_lost_others_pct)
+    );
+    
+    const awayOthersScore = avg(awayOffensive, homeDefensive);
+    
+    return {
+      homeOthers: homeOthersScore !== null ? Math.round(homeOthersScore) : null,
+      awayOthers: awayOthersScore !== null ? Math.round(awayOthersScore) : null
+    };
+  }
+  
+  const othersScores = calculateOthersScores(insights);
+
   // Per-contract odds helper
   function oddsFor(marketId, contractId) {
     if (!marketId || !contractId) return { back: null, lay: null, last: null };
@@ -562,6 +627,14 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
   const anyDrawOdds = oddsFor(cs, e.correct_score_any_other_draw_contract_id ? String(e.correct_score_any_other_draw_contract_id) : null);
   const over45Odds = oddsFor(ou45, e.over_45_contract_id ? String(e.over_45_contract_id) : null);
 
+  function scoreClass(s) {
+    if (typeof s !== 'number' || !Number.isFinite(s)) return '';
+    if (s >= 80) return 'confidence-green';
+    if (s >= 65) return 'confidence-yellow';
+    if (s >= 50) return 'confidence-amber';
+    return 'confidence-red';
+  }
+
   return h("div", { class: "card", ref: rootRef, 'data-eid': eid },
     h("div", { class: "actions" },
       h("button", { class: `icon-btn maybe${maybeActive ? ' active' : ''}`, title: "Bookmark: Maybe Bet", onClick: onToggleMaybe, 'aria-pressed': !!maybeActive },
@@ -580,8 +653,7 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
           h("line", { x1: 5, y1: 5, x2: 19, y2: 19 }),
           h("line", { x1: 19, y1: 5, x2: 5, y2: 19 })
         )
-      ),
-      (score != null) ? h("span", { class: `confidence-badge ${scoreClass(score)}`, title: "Match Score" }, String(Math.round(score))) : null
+      )
     ),
     h("div", { class: "row" },
       h("div", { class: "teams" },
@@ -600,18 +672,18 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
       h(OddCell, { label: "Draw", odds: drawOdds }),
       h(OddCell, { label: away || "Away", odds: awayOdds }),
       h(OddCell, { label: "Over 4.5", odds: over45Odds }),
-      h(OddCell, { label: "Home Others", odds: anyHomeOdds }),
-      h(OddCell, { label: "Away Others", odds: anyAwayOdds }),
+      h(OddCell, { label: "Home Others", odds: anyHomeOdds, score: othersScores.homeOthers, scoreClass }),
+      h(OddCell, { label: "Away Others", odds: anyAwayOdds, score: othersScores.awayOthers, scoreClass }),
     ),
     h("div", { class: "analysis-toggle" },
       h("button", { class: "analysis-btn", onClick: onToggleExpand, disabled: !statsAvailable, title: (!statsAvailable ? "Stats not available" : "") }, statsBtnText),
       (url && url !== "#") ? h("a", { class: "analysis-btn", href: url, target: "smarkets", rel: "noopener noreferrer", title: "Open in Smarkets", onClick: (ev) => { ev.preventDefault(); try { window.open(url, 'smarkets', 'noopener'); } catch {} } }, "Open in Smarkets") : null
     ),
-    expandedOpen ? h(AnalysisPanel, { insights }) : null
+    expandedOpen ? h(AnalysisPanel, { insights, homeOthersScore: othersScores.homeOthers, awayOthersScore: othersScores.awayOthers, scoreClass }) : null
   );
 }
 
-function OddCell({ label, odds }) {
+function OddCell({ label, odds, score, scoreClass }) {
   function fmtDec(n) {
     if (typeof n !== 'number' || !Number.isFinite(n)) return '-';
     const dp = n < 3 ? 2 : 1;
@@ -621,7 +693,10 @@ function OddCell({ label, odds }) {
   const layStr = fmtDec(odds.lay);
   const lastStr = fmtDec(odds.last);
     return h("div", { class: "odd" },
-      h("div", { class: "label" }, label),
+      h("div", { class: "label" }, 
+        label,
+        (score != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(score)}`, title: "Others Score", style: "margin-left: 4px; font-size: 10px; padding: 2px 4px;" }, String(score)) : null
+      ),
       h("div", { class: "prices" },
         h("span", { class: "badge back", title: "Back" }, backStr),
         h("span", { class: "badge lay", title: "Lay" }, layStr),
@@ -678,7 +753,7 @@ function bpsToDecimal(bps) {
   return 10000 / n;
 }
 
-function AnalysisPanel({ insights }) {
+function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass }) {
   if (!insights || !insights.home || !insights.away) {
     return h("div", { class: "analysis-panel" }, h("div", { class: "small" }, ""));
   }
@@ -701,7 +776,10 @@ function AnalysisPanel({ insights }) {
   return h("div", { class: "analysis-panel" },
     h("div", { class: "stats-grid" }, [
       h("div", { class: "stats-col" }, [
-        h("div", { class: "stats-title" }, homeTitle),
+        h("div", { class: "stats-title" }, 
+          homeTitle,
+          (homeOthersScore != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(homeOthersScore)}`, title: "Home Others Score", style: "margin-left: 6px; font-size: 11px;" }, String(homeOthersScore)) : null
+        ),
         home.league_name ? h("div", { class: "stats-subtitle" }, `(${home.league_name})`) : null,
         ...(homeN > 0 ? [
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(homeN))]),
@@ -749,7 +827,10 @@ function AnalysisPanel({ insights }) {
         ])
       ]),
       h("div", { class: "stats-col" }, [
-        h("div", { class: "stats-title" }, awayTitle),
+        h("div", { class: "stats-title" }, 
+          awayTitle,
+          (awayOthersScore != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(awayOthersScore)}`, title: "Away Others Score", style: "margin-left: 6px; font-size: 11px;" }, String(awayOthersScore)) : null
+        ),
         away.league_name ? h("div", { class: "stats-subtitle" }, `(${away.league_name})`) : null,
         ...(awayN > 0 ? [
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(awayN))]),
