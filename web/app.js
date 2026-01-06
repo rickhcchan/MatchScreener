@@ -600,6 +600,9 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
   }
   
   const othersScores = calculateOthersScores(insights);
+  
+  // Track highlight mode for stats
+  const [highlightMode, setHighlightMode] = useState(null); // null | 'home' | 'away'
 
   // Per-contract odds helper
   function oddsFor(marketId, contractId) {
@@ -673,18 +676,18 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
       h(OddCell, { label: "Draw", odds: drawOdds }),
       h(OddCell, { label: away || "Away", odds: awayOdds }),
       h(OddCell, { label: "Over 4.5", odds: over45Odds }),
-      h(OddCell, { label: "Home Others", odds: anyHomeOdds, score: othersScores.homeOthers, scoreClass }),
-      h(OddCell, { label: "Away Others", odds: anyAwayOdds, score: othersScores.awayOthers, scoreClass }),
+      h(OddCell, { label: "Home Others", odds: anyHomeOdds, score: othersScores.homeOthers, scoreClass, onScoreClick: () => setHighlightMode(highlightMode === 'home' ? null : 'home') }),
+      h(OddCell, { label: "Away Others", odds: anyAwayOdds, score: othersScores.awayOthers, scoreClass, onScoreClick: () => setHighlightMode(highlightMode === 'away' ? null : 'away') }),
     ),
     h("div", { class: "analysis-toggle" },
       h("button", { class: "analysis-btn", onClick: onToggleExpand, disabled: !statsAvailable, title: (!statsAvailable ? "Stats not available" : "") }, statsBtnText),
       (url && url !== "#") ? h("a", { class: "analysis-btn", href: url, target: "smarkets", rel: "noopener noreferrer", title: "Open in Smarkets", onClick: (ev) => { ev.preventDefault(); try { window.open(url, 'smarkets', 'noopener'); } catch {} } }, "Open in Smarkets") : null
     ),
-    expandedOpen ? h(AnalysisPanel, { insights, homeOthersScore: othersScores.homeOthers, awayOthersScore: othersScores.awayOthers, scoreClass }) : null
+    expandedOpen ? h(AnalysisPanel, { insights, highlightMode }) : null
   );
 }
 
-function OddCell({ label, odds, score, scoreClass }) {
+function OddCell({ label, odds, score, scoreClass, onScoreClick }) {
   function fmtDec(n) {
     if (typeof n !== 'number' || !Number.isFinite(n)) return '-';
     const dp = n < 3 ? 2 : 1;
@@ -694,9 +697,14 @@ function OddCell({ label, odds, score, scoreClass }) {
   const layStr = fmtDec(odds.lay);
   const lastStr = fmtDec(odds.last);
     return h("div", { class: "odd" },
-      h("div", { class: "label" }, 
-        label,
-        (score != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(score)}`, title: "Others Score", style: "margin-left: 4px; font-size: 10px; padding: 2px 4px;" }, String(score)) : null
+      h("div", { class: "label", style: "display: flex; align-items: center; justify-content: center; gap: 4px;" }, 
+        h("span", {}, label),
+        (score != null && scoreClass) ? h("span", { 
+          class: `confidence-badge ${scoreClass(score)}`, 
+          title: "Lay Confidence (click to highlight)", 
+          style: "font-size: 10px; padding: 2px 5px; min-width: 22px; cursor: pointer;",
+          onClick: onScoreClick
+        }, String(score)) : null
       ),
       h("div", { class: "prices" },
         h("span", { class: "badge back", title: "Back" }, backStr),
@@ -754,7 +762,7 @@ function bpsToDecimal(bps) {
   return 10000 / n;
 }
 
-function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass }) {
+function AnalysisPanel({ insights, highlightMode }) {
   if (!insights || !insights.home || !insights.away) {
     return h("div", { class: "analysis-panel" }, h("div", { class: "small" }, ""));
   }
@@ -762,6 +770,29 @@ function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass 
     if (typeof x !== 'number' || !Number.isFinite(x)) return '-';
     return `${Math.round(x * 100)}%`;
   }
+  
+  // Helper to determine if a stat should be dimmed
+  function isDimmed(team, statKey) {
+    if (!highlightMode) return false; // No dimming when not in highlight mode
+    
+    if (highlightMode === 'home') {
+      // Home Others: highlight offensive home stats + defensive away stats
+      if (team === 'home') {
+        return !['avg_goals_scored', 'wins_others_pct', 'home_ht_2plus_pct', 'ht_2plus_to_win_others_pct'].includes(statKey);
+      } else { // away team
+        return !['avg_goals_conceded', 'losses_others_pct', 'away_ht_2plus_conceded_pct', 'away_ht_2plus_conceded_to_lost_others_pct'].includes(statKey);
+      }
+    } else if (highlightMode === 'away') {
+      // Away Others: highlight offensive away stats + defensive home stats
+      if (team === 'away') {
+        return !['avg_goals_scored', 'wins_others_pct', 'away_ht_2plus_pct', 'ht_2plus_to_win_others_pct'].includes(statKey);
+      } else { // home team
+        return !['avg_goals_conceded', 'losses_others_pct', 'home_ht_2plus_conceded_pct', 'home_ht_2plus_conceded_to_lost_others_pct'].includes(statKey);
+      }
+    }
+    return false;
+  }
+  
   const home = insights.home || {};
   const away = insights.away || {};
   const h2h = insights.h2h || {};
@@ -774,23 +805,27 @@ function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass 
   const homeN = typeof home.n === 'number' ? home.n : 0;
   const awayN = typeof away.n === 'number' ? away.n : 0;
   const h2hN = typeof h2h.n === 'number' ? h2h.n : 0;
+  
+  // Create stat div with conditional dimming
+  const statDiv = (team, statKeys, content) => {
+    const shouldDim = statKeys.some(key => isDimmed(team, key));
+    return h("div", { class: "stat", style: shouldDim ? "opacity: 0.35;" : "" }, content);
+  };
+  
   return h("div", { class: "analysis-panel" },
     h("div", { class: "stats-grid" }, [
       h("div", { class: "stats-col" }, [
-        h("div", { class: "stats-title" }, 
-          homeTitle,
-          (homeOthersScore != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(homeOthersScore)}`, title: "Home Others Score", style: "margin-left: 6px; font-size: 11px;" }, String(homeOthersScore)) : null
-        ),
+        h("div", { class: "stats-title" }, homeTitle),
         home.league_name ? h("div", { class: "stats-subtitle" }, `(${home.league_name})`) : null,
         ...(homeN > 0 ? [
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(homeN))]),
-          h("div", { class: "stat" }, [
+          statDiv('home', ['avg_goals_scored', 'avg_goals_conceded'], [
             "Avg ⚽ / ⛔: ",
             h("strong", {}, home.avg_goals_scored != null ? home.avg_goals_scored.toFixed(2) : '-'),
             " / ",
             h("strong", {}, home.avg_goals_conceded != null ? home.avg_goals_conceded.toFixed(2) : '-'),
           ]),
-          h("div", { class: "stat" }, [
+          statDiv('home', ['wins_others_pct', 'losses_others_pct'], [
             "Win Others / Lost Others: ",
             h("strong", {}, (typeof home.wins_others_pct === 'number' ? percent(home.wins_others_pct) : '-')),
             " / ",
@@ -798,25 +833,25 @@ function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass 
           ]),
           // Only show HT stats if they exist
           ...(typeof home.home_ht_2plus_pct === 'number' || typeof home.away_ht_2plus_pct === 'number' ? [
-            h("div", { class: "stat" }, [
+            statDiv('home', ['home_ht_2plus_pct', 'away_ht_2plus_pct'], [
               "HT 2+ ⚽ (H / A): ",
               h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-')),
               " / ",
               h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-')),
             ]),
-            h("div", { class: "stat" }, [
+            statDiv('home', ['ht_2plus_to_win_others_pct'], [
               "HT 2+ ⚽ → Win 4+ (H / A): ",
               h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
               " / ",
               h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
             ]),
-            h("div", { class: "stat" }, [
+            statDiv('home', ['home_ht_2plus_conceded_pct', 'away_ht_2plus_conceded_pct'], [
               "HT 2+ ⛔ (H / A): ",
               h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-')),
               " / ",
               h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-')),
             ]),
-            h("div", { class: "stat" }, [
+            statDiv('home', ['home_ht_2plus_conceded_to_lost_others_pct', 'away_ht_2plus_conceded_to_lost_others_pct'], [
               "HT 2+ ⛔ → Lost 4+ (H / A): ",
               h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
               " / ",
@@ -828,51 +863,60 @@ function AnalysisPanel({ insights, homeOthersScore, awayOthersScore, scoreClass 
         ])
       ]),
       h("div", { class: "stats-col" }, [
-        h("div", { class: "stats-title" }, 
-          awayTitle,
-          (awayOthersScore != null && scoreClass) ? h("span", { class: `confidence-badge ${scoreClass(awayOthersScore)}`, title: "Away Others Score", style: "margin-left: 6px; font-size: 11px;" }, String(awayOthersScore)) : null
-        ),
+        h("div", { class: "stats-title" }, awayTitle),
         away.league_name ? h("div", { class: "stats-subtitle" }, `(${away.league_name})`) : null,
         ...(awayN > 0 ? [
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(awayN))]),
-          h("div", { class: "stat" }, [
-            "Avg ⚽ / ⛔: ",
-            h("strong", {}, away.avg_goals_scored != null ? away.avg_goals_scored.toFixed(2) : '-'),
-            " / ",
-            h("strong", {}, away.avg_goals_conceded != null ? away.avg_goals_conceded.toFixed(2) : '-'),
-          ]),
-          h("div", { class: "stat" }, [
-            "Win Others / Lost Others: ",
-            h("strong", {}, (typeof away.wins_others_pct === 'number' ? percent(away.wins_others_pct) : '-')),
-            " / ",
-            h("strong", {}, (typeof away.losses_others_pct === 'number' ? percent(away.losses_others_pct) : '-')),
-          ]),
+          statDiv('away', ['avg_goals_scored', 'avg_goals_conceded'], 
+            h("div", { class: "stat" }, [
+              "Avg ⚽ / ⛔: ",
+              h("strong", {}, away.avg_goals_scored != null ? away.avg_goals_scored.toFixed(2) : '-'),
+              " / ",
+              h("strong", {}, away.avg_goals_conceded != null ? away.avg_goals_conceded.toFixed(2) : '-'),
+            ])
+          ),
+          statDiv('away', ['wins_others_pct', 'losses_others_pct'], 
+            h("div", { class: "stat" }, [
+              "Win Others / Lost Others: ",
+              h("strong", {}, (typeof away.wins_others_pct === 'number' ? percent(away.wins_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.losses_others_pct === 'number' ? percent(away.losses_others_pct) : '-')),
+            ])
+          ),
           // Only show HT stats if they exist
           ...(typeof away.home_ht_2plus_pct === 'number' || typeof away.away_ht_2plus_pct === 'number' ? [
-            h("div", { class: "stat" }, [
-              "HT 2+ ⚽ (H / A): ",
-              h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-')),
-              " / ",
-              h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-')),
-            ]),
-            h("div", { class: "stat" }, [
-              "HT 2+ ⚽ → Win 4+ (H / A): ",
-              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
-              " / ",
-              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
-            ]),
-            h("div", { class: "stat" }, [
-              "HT 2+ ⛔ (H / A): ",
-              h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-')),
-              " / ",
-              h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-')),
-            ]),
-            h("div", { class: "stat" }, [
-              "HT 2+ ⛔ → Lost 4+ (H / A): ",
-              h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
-              " / ",
-              h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
-            ]),
+            statDiv('away', ['home_ht_2plus_pct', 'away_ht_2plus_pct'], 
+              h("div", { class: "stat" }, [
+                "HT 2+ ⚽ (H / A): ",
+                h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-')),
+                " / ",
+                h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-')),
+              ])
+            ),
+            statDiv('away', ['ht_2plus_to_win_others_pct'], 
+              h("div", { class: "stat" }, [
+                "HT 2+ ⚽ → Win 4+ (H / A): ",
+                h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
+                " / ",
+                h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
+              ])
+            ),
+            statDiv('away', ['home_ht_2plus_conceded_pct', 'away_ht_2plus_conceded_pct'], 
+              h("div", { class: "stat" }, [
+                "HT 2+ ⛔ (H / A): ",
+                h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-')),
+                " / ",
+                h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-')),
+              ])
+            ),
+            statDiv('away', ['home_ht_2plus_conceded_to_lost_others_pct', 'away_ht_2plus_conceded_to_lost_others_pct'], 
+              h("div", { class: "stat" }, [
+                "HT 2+ ⛔ → Lost 4+ (H / A): ",
+                h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
+                " / ",
+                h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
+              ])
+            ),
           ] : []),
         ] : [
           h("div", { class: "stat small" }, "Stats not available"),
