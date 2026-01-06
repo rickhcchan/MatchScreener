@@ -17,6 +17,9 @@ WORLD_LATEST_URL = "https://www.football-data.co.uk/new/Latest_Results.xlsx"
 
 def normalize_team_name(name: str) -> str:
     s = str(name).lower().strip()
+    # Normalize special characters (Norwegian, etc.)
+    for k, v in {"ø": "o", "å": "a", "æ": "ae", "ö": "o", "ä": "a", "ü": "u", "é": "e", "è": "e", "ê": "e", "ë": "e", "í": "i", "ì": "i", "ç": "c"}.items():
+        s = s.replace(k, v)
     for k, v in {"&": "and", "-": " ", "/": " ", "'": "", ".": ""}.items():
         s = s.replace(k, v)
     words = s.split()
