@@ -596,9 +596,10 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
     
     const awayOthersScore = avg(awayOffensive, homeDefensive);
     
+    // Invert scores: high score = high confidence to LAY (unlikely to happen)
     return {
-      homeOthers: homeOthersScore !== null ? Math.round(homeOthersScore) : null,
-      awayOthers: awayOthersScore !== null ? Math.round(awayOthersScore) : null
+      homeOthers: homeOthersScore !== null ? Math.round(100 - homeOthersScore) : null,
+      awayOthers: awayOthersScore !== null ? Math.round(100 - awayOthersScore) : null
     };
   }
   
