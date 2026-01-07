@@ -251,7 +251,7 @@ function EventsTable() {
       if (e.correct_score_any_other_away_win_contract_id) cids.push(String(e.correct_score_any_other_away_win_contract_id));
       if (e.correct_score_any_other_draw_contract_id) cids.push(String(e.correct_score_any_other_draw_contract_id));
       if (e.over_under_45_market_id) mids.push(String(e.over_under_45_market_id));
-      if (e.over_under_45_contract_over_id) cids.push(String(e.over_under_45_contract_over_id));
+      if (e.over_45_contract_id) cids.push(String(e.over_45_contract_id));
     });
     eventsRef.current = state.data.events || [];
     marketIdsRef.current = Array.from(new Set(mids));
