@@ -24,6 +24,7 @@ function EventsTable() {
   const [state, setState] = useState({ loading: true, error: null, data: { count: 0, events: [] } });
     const [selectedDay, setSelectedDay] = useState(null); // null => today
     const [viewMode, setViewMode] = useState('all'); // 'all' | 'betted' | 'bettable' | 'starred'
+    const [selectedLeague, setSelectedLeague] = useState('all'); // league filter
     function ymd(offsetDays = 0) {
       const d = new Date();
       d.setDate(d.getDate() + offsetDays);
@@ -200,6 +201,11 @@ function EventsTable() {
     return () => { cancelled = true; clearInterval(timer); clearInterval(oddsTimer); clearInterval(quotesTimer); };
   }, [selectedDay]);
 
+  // Reset league filter when date changes
+  useEffect(() => {
+    setSelectedLeague('all');
+  }, [selectedDay]);
+
   // Odds-highlevel fetch removed per request
 
   // Persisted marks (v2): by date bucket; prune older than KEEP_DAYS
@@ -262,9 +268,28 @@ function EventsTable() {
   if (state.error) return h("p", { class: "small" }, `Error: ${state.error}`);
 
   const rows = state.data.events || [];
+  
+  // Extract distinct leagues for dropdown
+  const leaguesSet = new Set();
+  rows.forEach(e => {
+    const league = extractLeagueName(e.full_slug);
+    if (league) leaguesSet.add(league);
+  });
+  const leagueOptions = ['all', ...Array.from(leaguesSet).sort()];
+  
   let displayRows = rows;
+  
+  // Apply league filter first
+  if (selectedLeague !== 'all') {
+    displayRows = displayRows.filter(e => {
+      const league = extractLeagueName(e.full_slug);
+      return league === selectedLeague;
+    });
+  }
+  
+  // Then apply view mode filter
   if (viewMode === 'betted') {
-    displayRows = rows.filter(e => {
+    displayRows = displayRows.filter(e => {
       const dk = dateKeyForEvent(e);
       const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
       if (!entry.bet) return false;
@@ -274,7 +299,7 @@ function EventsTable() {
       return true; // show all betted matches not ended
     });
   } else if (viewMode === 'bettable') {
-    displayRows = rows.filter(e => {
+    displayRows = displayRows.filter(e => {
       const dk = dateKeyForEvent(e);
       const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
       if (entry.bet) return false; // exclude already betted
@@ -290,7 +315,7 @@ function EventsTable() {
       return withinTwoHours;
     });
   } else if (viewMode === 'starred') {
-    displayRows = rows.filter(e => {
+    displayRows = displayRows.filter(e => {
       const dk = dateKeyForEvent(e);
       const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
       if (!entry.maybe) return false;
@@ -393,6 +418,11 @@ function EventsTable() {
             setSelectedDay(v ? v : null);
           }
         }, dayOptions.map(opt => h("option", { value: opt.value || "" }, opt.label))),
+        h("select", {
+          class: "analysis-btn",
+          value: selectedLeague,
+          onChange: (e) => setSelectedLeague(e.target.value)
+        }, leagueOptions.map(opt => h("option", { value: opt }, opt === 'all' ? 'All Leagues' : opt))),
         (() => {
           const labels = { all: "All Matches", betted: "Betted", bettable: "Starting in 2 Hours", starred: "Starred" };
           return h("button", {
