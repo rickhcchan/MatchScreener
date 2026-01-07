@@ -384,7 +384,7 @@ function EventsTable() {
     [
       // Highlevel Odds UI removed per request
       h("div", { class: "analysis-toggle" }, [
-        h("label", { class: "small", style: { marginRight: "6px" } }, "Date:"),
+        //h("label", { class: "small", style: { marginRight: "6px" } }, "Date:"),
         h("select", {
           class: "analysis-btn",
           value: selectedDay || "",
@@ -394,7 +394,7 @@ function EventsTable() {
           }
         }, dayOptions.map(opt => h("option", { value: opt.value || "" }, opt.label))),
         (() => {
-          const labels = { all: "Show All Matches", betted: "Show Betted", bettable: "Show Starting Soon (≤ 2h)", starred: "Show Starred" };
+          const labels = { all: "All Matches", betted: "Betted", bettable: "Starting in 2 Hours", starred: "Starred" };
           return h("button", {
             class: "analysis-btn",
             onClick: () => setViewMode(m => (m === 'all' ? 'bettable' : (m === 'bettable' ? 'betted' : (m === 'betted' ? 'starred' : 'all')))),
