@@ -27,12 +27,12 @@ from api.analytics import (
 load_dotenv()  # Load .env in local dev
 APP = FastAPI(title="MatchScreener API")
 
-# Cache TTL settings (seconds)
-_EVENTS_TTL_SECS: int = 60
-_STATES_TTL_SECS: int = 15
-_ODDS_TTL_SECS: int = 5
-_QUOTES_TTL_SECS: int = 2
-_ANALYTICS_TTL_SECS: int = 300
+# Cache TTL settings (seconds) - overridable via environment variables
+_EVENTS_TTL_SECS: int = int(os.environ.get("EVENTS_TTL_SECS", "60"))
+_STATES_TTL_SECS: int = int(os.environ.get("STATES_TTL_SECS", "15"))
+_ODDS_TTL_SECS: int = int(os.environ.get("ODDS_TTL_SECS", "5"))
+_QUOTES_TTL_SECS: int = int(os.environ.get("QUOTES_TTL_SECS", "2"))
+_ANALYTICS_TTL_SECS: int = int(os.environ.get("ANALYTICS_TTL_SECS", "300"))
 
 DATA_PATH = os.environ.get("DATA_PATH", "data/matches_v1.parquet")
 REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "")

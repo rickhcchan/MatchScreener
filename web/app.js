@@ -23,7 +23,7 @@ const QUOTES_POLL_SECS = 5; // quotes poll interval
 function EventsTable() {
   const [state, setState] = useState({ loading: true, error: null, data: { count: 0, events: [] } });
     const [selectedDay, setSelectedDay] = useState(null); // null => today
-    const [viewMode, setViewMode] = useState('all'); // 'all' | 'betted' | 'bettable' | 'starred'
+    const [viewMode, setViewMode] = useState('all'); // 'all' | 'inprogress' | 'betted' | 'bettable' | 'starred'
     const [selectedLeague, setSelectedLeague] = useState('all'); // league filter
     function ymd(offsetDays = 0) {
       const d = new Date();
@@ -212,7 +212,14 @@ function EventsTable() {
     let filteredRows = rows;
     
     // Apply viewMode filter to get available leagues
-    if (viewMode === 'betted') {
+    if (viewMode === 'inprogress') {
+      filteredRows = rows.filter(e => {
+        const st = statesMap[e.id] || {};
+        const mp = (st.match_period || '').toLowerCase();
+        if (mp === 'pre_match' || mp === 'full_time') return false;
+        return true;
+      });
+    } else if (viewMode === 'betted') {
       filteredRows = rows.filter(e => {
         const dk = dateKeyForEvent(e);
         const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
@@ -325,7 +332,15 @@ function EventsTable() {
   let displayRows = rows;
   
   // Apply view mode filter first
-  if (viewMode === 'betted') {
+  if (viewMode === 'inprogress') {
+    displayRows = displayRows.filter(e => {
+      const st = statesMap[e.id] || {};
+      const mp = (st.match_period || '').toLowerCase();
+      // In progress: not pre_match, not full_time
+      if (mp === 'pre_match' || mp === 'full_time') return false;
+      return true;
+    });
+  } else if (viewMode === 'betted') {
     displayRows = displayRows.filter(e => {
       const dk = dateKeyForEvent(e);
       const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
@@ -468,19 +483,19 @@ function EventsTable() {
             setSelectedDay(v ? v : null);
           }
         }, dayOptions.map(opt => h("option", { value: opt.value || "" }, opt.label))),
+        (() => {
+          const labels = { all: "All Matches", inprogress: "In Progress", betted: "Betted", bettable: "Starting in 2 Hours", starred: "Starred" };
+          return h("button", {
+            class: "analysis-btn",
+            onClick: () => setViewMode(m => (m === 'all' ? 'inprogress' : (m === 'inprogress' ? 'bettable' : (m === 'bettable' ? 'betted' : (m === 'betted' ? 'starred' : 'all'))))),
+            title: "Cycle view: All → In Progress → Starting Soon → Betted → Starred"
+          }, labels[viewMode]);
+        })(),
         h("select", {
-          class: "analysis-btn",
+          class: "analysis-btn league-dropdown",
           value: selectedLeague,
           onChange: (e) => setSelectedLeague(e.target.value)
         }, leagueOptions.map(opt => h("option", { value: opt }, opt === 'all' ? 'All Leagues' : opt))),
-        (() => {
-          const labels = { all: "All Matches", betted: "Betted", bettable: "Starting in 2 Hours", starred: "Starred" };
-          return h("button", {
-            class: "analysis-btn",
-            onClick: () => setViewMode(m => (m === 'all' ? 'bettable' : (m === 'bettable' ? 'betted' : (m === 'betted' ? 'starred' : 'all')))),
-            title: "Cycle view: All → Starting Soon → Betted → Starred"
-          }, labels[viewMode]);
-        })(),
       ]),
       (displayRows.length === 0) ? h("div", { class: "empty-state" }, emptyText) : null,
       ...displayRows.map(e => {
