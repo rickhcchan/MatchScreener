@@ -206,6 +206,59 @@ function EventsTable() {
     setSelectedLeague('all');
   }, [selectedDay]);
 
+  // Reset league filter when viewMode changes if selected league no longer exists in filtered view
+  useEffect(() => {
+    const rows = state.data.events || [];
+    let filteredRows = rows;
+    
+    // Apply viewMode filter to get available leagues
+    if (viewMode === 'betted') {
+      filteredRows = rows.filter(e => {
+        const dk = dateKeyForEvent(e);
+        const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
+        if (!entry.bet) return false;
+        const st = statesMap[e.id] || {};
+        const mp = (st.match_period || '').toLowerCase();
+        if (mp === 'full_time') return false;
+        return true;
+      });
+    } else if (viewMode === 'bettable') {
+      filteredRows = rows.filter(e => {
+        const st = statesMap[e.id] || {};
+        const mp = (st.match_period || '').toLowerCase();
+        if (mp === 'full_time') return false;
+        const dt = e.start_datetime ? new Date(e.start_datetime) : null;
+        if (!dt) return false;
+        const diffMs = dt.getTime() - Date.now();
+        if (diffMs <= 0) return false;
+        const withinTwoHours = diffMs <= (120 * 60 * 1000);
+        return withinTwoHours;
+      });
+    } else if (viewMode === 'starred') {
+      filteredRows = rows.filter(e => {
+        const dk = dateKeyForEvent(e);
+        const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
+        if (!entry.maybe) return false;
+        const st = statesMap[e.id] || {};
+        const mp = (st.match_period || '').toLowerCase();
+        if (mp === 'full_time') return false;
+        return true;
+      });
+    }
+    
+    // Build available leagues from filtered rows
+    const availableLeagues = new Set();
+    filteredRows.forEach(e => {
+      const league = extractLeagueName(e.full_slug);
+      if (league) availableLeagues.add(league);
+    });
+    
+    // If current selection doesn't exist in filtered view, reset to 'all'
+    if (selectedLeague !== 'all' && !availableLeagues.has(selectedLeague)) {
+      setSelectedLeague('all');
+    }
+  }, [viewMode, state.data.events, marksByDate, statesMap]);
+
   // Odds-highlevel fetch removed per request
 
   // Persisted marks (v2): by date bucket; prune older than KEEP_DAYS
@@ -269,25 +322,9 @@ function EventsTable() {
 
   const rows = state.data.events || [];
   
-  // Extract distinct leagues for dropdown
-  const leaguesSet = new Set();
-  rows.forEach(e => {
-    const league = extractLeagueName(e.full_slug);
-    if (league) leaguesSet.add(league);
-  });
-  const leagueOptions = ['all', ...Array.from(leaguesSet).sort()];
-  
   let displayRows = rows;
   
-  // Apply league filter first
-  if (selectedLeague !== 'all') {
-    displayRows = displayRows.filter(e => {
-      const league = extractLeagueName(e.full_slug);
-      return league === selectedLeague;
-    });
-  }
-  
-  // Then apply view mode filter
+  // Apply view mode filter first
   if (viewMode === 'betted') {
     displayRows = displayRows.filter(e => {
       const dk = dateKeyForEvent(e);
@@ -300,9 +337,6 @@ function EventsTable() {
     });
   } else if (viewMode === 'bettable') {
     displayRows = displayRows.filter(e => {
-      const dk = dateKeyForEvent(e);
-      const entry = (marksByDate[dk] || {})[String(e.id)] || { maybe: false, bet: false };
-      if (entry.bet) return false; // exclude already betted
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
       if (mp === 'full_time') return false; // exclude ended events
@@ -323,6 +357,22 @@ function EventsTable() {
       const mp = (st.match_period || '').toLowerCase();
       if (mp === 'full_time') return false; // exclude ended events
       return true;
+    });
+  }
+  
+  // Extract distinct leagues from filtered rows (after viewMode filter)
+  const leaguesSet = new Set();
+  displayRows.forEach(e => {
+    const league = extractLeagueName(e.full_slug);
+    if (league) leaguesSet.add(league);
+  });
+  const leagueOptions = ['all', ...Array.from(leaguesSet).sort()];
+  
+  // Then apply league filter
+  if (selectedLeague !== 'all') {
+    displayRows = displayRows.filter(e => {
+      const league = extractLeagueName(e.full_slug);
+      return league === selectedLeague;
     });
   }
   const emptyText = (() => {

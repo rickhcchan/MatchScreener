@@ -32,7 +32,7 @@ _EVENTS_TTL_SECS: int = 60
 _STATES_TTL_SECS: int = 15
 _ODDS_TTL_SECS: int = 5
 _QUOTES_TTL_SECS: int = 2
-_ANALYTICS_TTL_SECS: int = 2
+_ANALYTICS_TTL_SECS: int = 300
 
 DATA_PATH = os.environ.get("DATA_PATH", "data/matches_v1.parquet")
 REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "")
