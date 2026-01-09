@@ -25,6 +25,12 @@ TEAM_ALIASES: dict[str, str] = {
     "psg": "paris",
     "ac milan": "milan",
     "inter milan": "inter",
+    "eintracht frankfurt": "ein frankfurt",
+    "borussia dortmund": "dortmund",
+    "real sporting de gijon": "sp gijon",
+    "real sociedad": "sociedad",
+    "mk dons": "milton keynes dons",
+    "oxford utd": "oxford",
 }
 
 
