@@ -340,9 +340,15 @@ function EventsTable() {
     displayRows = displayRows.filter(e => {
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
-      // In progress: not pre_match, not full_time
-      if (mp === 'pre_match' || mp === 'full_time') return false;
-      return true;
+      // Exclude finished matches
+      if (mp === 'full_time') return false;
+      // Include only if there's a live clock OR match period indicates live play
+      const liveClock = (st && st.clock_text) ? String(st.clock_text) : null;
+      const isLivePeriod = mp && mp !== 'pre_match' && mp !== '';
+      // Also check if start time has passed
+      const dt = e.start_datetime ? new Date(e.start_datetime) : null;
+      const hasStarted = dt ? (dt.getTime() - Date.now() < 0) : false;
+      return liveClock || (isLivePeriod && hasStarted);
     });
   } else if (viewMode === 'betted') {
     displayRows = displayRows.filter(e => {
