@@ -166,6 +166,8 @@ def compute_team_stats(df: pd.DataFrame, team_norm: str, div_code: Optional[str]
         "n": int(len(sub)),
         "avg_goals_scored": float(gf.mean()),
         "avg_goals_conceded": float(ga.mean()),
+        "avg_ht_goals_scored": float(gf_ht.mean()) if gf_ht is not None else None,
+        "avg_ht_goals_conceded": float(ga_ht.mean()) if ga_ht is not None else None,
         # Keep legacy keys for compatibility, though UI may ignore them
         "over_0_5_rate": float((total_goals >= 1).mean()),
         "clean_sheet_rate": float((ga == 0).mean()),

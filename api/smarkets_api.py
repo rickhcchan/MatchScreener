@@ -253,13 +253,15 @@ def fetch_event_markets(event_ids: List[str]) -> Dict[str, Dict[str, Optional[st
                 mt_obj = m.get("market_type") or {}
                 mt_name = (mt_obj.get("name") or "").upper()
                 mt_param = str(mt_obj.get("param") or "")
-                entry = out.get(ev_id) or {"winner_market_id": None, "correct_score_market_id": None, "over_under_45_market_id": None}
+                entry = out.get(ev_id) or {"winner_market_id": None, "correct_score_market_id": None, "over_under_45_market_id": None, "over_under_55_market_id": None}
                 if mt_name == "WINNER_3_WAY" and not entry["winner_market_id"]:
                     entry["winner_market_id"] = str(m.get("id")) if m.get("id") is not None else None
                 elif mt_name == "CORRECT_SCORE" and not entry["correct_score_market_id"]:
                     entry["correct_score_market_id"] = str(m.get("id")) if m.get("id") is not None else None
                 elif mt_name == "OVER_UNDER" and mt_param == "4.5" and not entry.get("over_under_45_market_id"):
                     entry["over_under_45_market_id"] = str(m.get("id")) if m.get("id") is not None else None
+                elif mt_name == "OVER_UNDER" and mt_param == "5.5" and not entry.get("over_under_55_market_id"):
+                    entry["over_under_55_market_id"] = str(m.get("id")) if m.get("id") is not None else None
                 out[ev_id] = entry
         except Exception:
             # Skip failing chunk but keep any results collected so far

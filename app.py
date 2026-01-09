@@ -99,18 +99,21 @@ def api_events(day: Optional[str] = None):
         # Require both Winner 3-way and Correct Score markets
         events = [e for e in events if e.get("winner_market_id") and e.get("correct_score_market_id")]
 
-        # Collect market IDs to fetch contracts (WINNER_3_WAY + CORRECT_SCORE + OVER_UNDER 4.5)
+        # Collect market IDs to fetch contracts (WINNER_3_WAY + CORRECT_SCORE + OVER_UNDER 4.5 + OVER_UNDER 5.5)
         market_ids: list[str] = []
         for e in events:
             wm = e.get("winner_market_id")
             cs = e.get("correct_score_market_id")
             over_45_market_id = e.get("over_under_45_market_id")
+            over_55_market_id = e.get("over_under_55_market_id")
             if wm:
                 market_ids.append(str(wm))
             if cs:
                 market_ids.append(str(cs))
             if over_45_market_id:
                 market_ids.append(str(over_45_market_id))
+            if over_55_market_id:
+                market_ids.append(str(over_55_market_id))
         contract_map: Dict[str, Any] = {}
         if market_ids:
             try:
@@ -178,6 +181,19 @@ def api_events(day: Optional[str] = None):
                 if t == "OVER":
                     over_45_contract_id = cid
 
+            # Over/Under 5.5
+            over_55_contract_id = None
+            over_55_market_id = e.get("over_under_55_market_id")
+            over_55_contracts = contract_map.get(str(over_55_market_id), []) if over_55_market_id else []
+            for c in over_55_contracts:
+                cid = str(c.get("id")) if c.get("id") is not None else None
+                if not cid:
+                    continue
+                ctype = (c.get("contract_type") or {}).get("name") or ""
+                t = ctype.upper().strip()
+                if t == "OVER":
+                    over_55_contract_id = cid
+
             enriched_contracts.append({
                 **e,
                 "winner_contract_home_id": home_id,
@@ -187,6 +203,7 @@ def api_events(day: Optional[str] = None):
                 "correct_score_any_other_away_win_contract_id": any_other_away_id,
                 "correct_score_any_other_draw_contract_id": any_other_draw_id,
                 "over_45_contract_id": over_45_contract_id,
+                "over_55_contract_id": over_55_contract_id,
             })
         events = enriched_contracts
         data = {"count": len(events), "events": events}
