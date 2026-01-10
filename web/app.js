@@ -20,6 +20,29 @@ const POLL_SECS = 30; // states poll interval
 const ODDS_POLL_SECS = 10; // odds poll interval
 const QUOTES_POLL_SECS = 5; // quotes poll interval
 
+// Merge new odds data with existing, preserving old values when new data is missing
+function mergeOddsData(prevOdds, newOdds) {
+  if (!newOdds || Object.keys(newOdds).length === 0) return prevOdds;
+  const merged = { ...prevOdds };
+  Object.keys(newOdds).forEach(marketId => {
+    if (!merged[marketId]) merged[marketId] = {};
+    Object.keys(newOdds[marketId]).forEach(contractId => {
+      merged[marketId][contractId] = newOdds[marketId][contractId];
+    });
+  });
+  return merged;
+}
+
+// Merge new quotes data with existing, preserving old values when new data is missing
+function mergeQuotesData(prevQuotes, newQuotes) {
+  if (!newQuotes || Object.keys(newQuotes).length === 0) return prevQuotes;
+  const merged = { ...prevQuotes };
+  Object.keys(newQuotes).forEach(contractId => {
+    merged[contractId] = newQuotes[contractId];
+  });
+  return merged;
+}
+
 function EventsTable() {
   const [state, setState] = useState({ loading: true, error: null, data: { count: 0, events: [] } });
     const [selectedDay, setSelectedDay] = useState(null); // null => today
@@ -36,6 +59,9 @@ function EventsTable() {
   const [statesMap, setStatesMap] = useState({}); // id -> { scores_current, match_time, state }
   const [oddsMap, setOddsMap] = useState({}); // market_id -> contract_id -> price entry
   const [quotesMap, setQuotesMap] = useState({}); // contract_id -> { best_offer_bps, best_bid_bps, ... }
+  const [lastUpdateMap, setLastUpdateMap] = useState({}); // event_id -> timestamp of last successful odds/quotes update
+  const [quotesLoading, setQuotesLoading] = useState(false); // true when quotes API request is in-flight
+  const [noDataAlerts, setNoDataAlerts] = useState({}); // event_id -> timestamp when "no data" alert should be shown
   const [toast, setToast] = useState(null); // { text, onUndo }
   const toastTimerRef = useRef(null);
   const [marksByDate, setMarksByDate] = useState({}); // dateKey -> eventId -> { maybe: bool, bet: bool }
@@ -43,6 +69,59 @@ function EventsTable() {
   const eventsRef = useRef([]);
   const marketIdsRef = useRef([]);
   const contractIdsRef = useRef([]);
+  
+  // Update timestamps for events that received fresh data
+  function updateTimestamps(dataMap, events) {
+    if (!dataMap || Object.keys(dataMap).length === 0) return;
+    const now = Date.now();
+    
+    setLastUpdateMap(prev => {
+      const updated = { ...prev };
+      const alertsToSet = {};
+      const alertsToClear = {};
+      
+      (events || []).forEach(e => {
+        const eid = String(e.id);
+        // Check if this event's markets/contracts are in the new data
+        const hasData = 
+          (e.winner_market_id && dataMap[e.winner_market_id]) ||
+          (e.correct_score_market_id && dataMap[e.correct_score_market_id]) ||
+          (e.over_under_45_market_id && dataMap[e.over_under_45_market_id]) ||
+          (e.over_under_55_market_id && dataMap[e.over_under_55_market_id]) ||
+          (e.winner_contract_home_id && dataMap[e.winner_contract_home_id]) ||
+          (e.winner_contract_draw_id && dataMap[e.winner_contract_draw_id]) ||
+          (e.winner_contract_away_id && dataMap[e.winner_contract_away_id]) ||
+          (e.over_45_contract_id && dataMap[e.over_45_contract_id]) ||
+          (e.over_55_contract_id && dataMap[e.over_55_contract_id]);
+        
+        if (hasData) {
+          updated[eid] = now;
+          alertsToClear[eid] = true;
+        } else if (prev[eid]) {
+          // Event previously had data but didn't get any in this update
+          alertsToSet[eid] = true;
+          console.warn(`NO DATA for event ${eid} - timer at ${Math.floor((now - prev[eid]) / 1000)}s`);
+        }
+      });
+      
+      // Update alerts
+      setNoDataAlerts(prevAlerts => {
+        const newAlerts = { ...prevAlerts };
+        // Add new alerts
+        Object.keys(alertsToSet).forEach(eid => {
+          newAlerts[eid] = true;
+        });
+        // Clear alerts for events that got data
+        Object.keys(alertsToClear).forEach(eid => {
+          delete newAlerts[eid];
+        });
+        return newAlerts;
+      });
+      
+      return updated;
+    });
+  }
+  
   const [expanded, setExpanded] = useState({}); // eventId -> bool
   const [insightsMap, setInsightsMap] = useState({}); // eventId -> insights payload
   // Visibility-driven insights fetch
@@ -150,13 +229,18 @@ function EventsTable() {
         if (marketIdsRef.current.length) {
           console.debug("Initial fetchOdds", { marketIds: marketIdsRef.current, contractIds: contractIdsRef.current });
           fetchOdds(marketIdsRef.current, contractIdsRef.current)
-            .then(o => setOddsMap(o.prices || {}))
+            .then(o => setOddsMap(prev => mergeOddsData(prev, o.prices || {})))
             .catch(err => console.warn("fetchOdds error", err));
           if (contractIdsRef.current.length) {
             console.debug("Initial fetchQuotes", { marketIds: marketIdsRef.current, contractIds: contractIdsRef.current });
+            setQuotesLoading(true);
             fetchQuotes(marketIdsRef.current, contractIdsRef.current)
-              .then(q => setQuotesMap(q.quotes || {}))
-              .catch(err => console.warn("fetchQuotes error", err));
+              .then(q => {
+                setQuotesMap(prev => mergeQuotesData(prev, q.quotes || {}));
+                updateTimestamps(q.quotes || {}, eventsRef.current);
+              })
+              .catch(err => console.warn("fetchQuotes error", err))
+              .finally(() => setQuotesLoading(false));
           }
         } else {
           console.info("No market IDs found on initial load; odds/quotes disabled for now.");
@@ -185,7 +269,7 @@ function EventsTable() {
       if (!mids.length) return;
       console.debug("Polling fetchOdds", { marketIds: mids, contractIds: contractIdsRef.current || [] });
       fetchOdds(mids, contractIdsRef.current || [])
-        .then(o => setOddsMap(o.prices || {}))
+        .then(o => setOddsMap(prev => mergeOddsData(prev, o.prices || {})))
         .catch(err => console.warn("fetchOdds error", err));
     }, ODDS_POLL_SECS * 1000);
 
@@ -195,9 +279,14 @@ function EventsTable() {
       const cids = contractIdsRef.current || [];
       if (!mids.length || !cids.length) return;
       console.debug("Polling fetchQuotes", { marketIds: mids, contractIds: cids });
+      setQuotesLoading(true);
       fetchQuotes(mids, cids)
-        .then(q => setQuotesMap(q.quotes || {}))
-        .catch(err => console.warn("fetchQuotes error", err));
+        .then(q => {
+          setQuotesMap(prev => mergeQuotesData(prev, q.quotes || {}));
+          updateTimestamps(q.quotes || {}, eventsRef.current);
+        })
+        .catch(err => console.warn("fetchQuotes error", err))
+        .finally(() => setQuotesLoading(false));
     }, QUOTES_POLL_SECS * 1000);
 
     return () => { cancelled = true; clearInterval(timer); clearInterval(oddsTimer); clearInterval(quotesTimer); };
@@ -340,8 +429,10 @@ function EventsTable() {
     displayRows = displayRows.filter(e => {
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
-      // Exclude finished matches
-      if (mp === 'full_time') return false;
+      const stateFromStates = (st.state || '').toLowerCase();
+      const stateFromEvent = (e.state || '').toLowerCase();
+      // Exclude finished matches (check both states API and event data)
+      if (mp === 'full_time' || stateFromStates === 'ended' || stateFromEvent === 'ended') return false;
       // Include only if there's a live clock OR match period indicates live play
       const liveClock = (st && st.clock_text) ? String(st.clock_text) : null;
       const isLivePeriod = mp && mp !== 'pre_match' && mp !== '';
@@ -357,14 +448,18 @@ function EventsTable() {
       if (!entry.bet) return false;
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
-      if (mp === 'full_time') return false; // exclude ended events
+      const stateFromStates = (st.state || '').toLowerCase();
+      const stateFromEvent = (e.state || '').toLowerCase();
+      if (mp === 'full_time' || stateFromStates === 'ended' || stateFromEvent === 'ended') return false; // exclude ended events
       return true; // show all betted matches not ended
     });
   } else if (viewMode === 'bettable') {
     displayRows = displayRows.filter(e => {
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
-      if (mp === 'full_time') return false; // exclude ended events
+      const stateFromStates = (st.state || '').toLowerCase();
+      const stateFromEvent = (e.state || '').toLowerCase();
+      if (mp === 'full_time' || stateFromStates === 'ended' || stateFromEvent === 'ended') return false; // exclude ended events
       // Only include matches that have NOT started yet and start within 120 minutes
       const dt = e.start_datetime ? new Date(e.start_datetime) : null;
       if (!dt) return false;
@@ -380,7 +475,9 @@ function EventsTable() {
       if (!entry.maybe) return false;
       const st = statesMap[e.id] || {};
       const mp = (st.match_period || '').toLowerCase();
-      if (mp === 'full_time') return false; // exclude ended events
+      const stateFromStates = (st.state || '').toLowerCase();
+      const stateFromEvent = (e.state || '').toLowerCase();
+      if (mp === 'full_time' || stateFromStates === 'ended' || stateFromEvent === 'ended') return false; // exclude ended events
       return true;
     });
   }
@@ -452,6 +549,25 @@ function EventsTable() {
   }
 
   function removeEvent(eventId) {
+    // Clear starred/betted status from localStorage
+    const removed = (state.data.events || []).find(ev => String(ev.id) === String(eventId));
+    if (removed) {
+      const dk = dateKeyForEvent(removed);
+      setMarksByDate(prev => {
+        const updated = { ...prev };
+        if (updated[dk] && updated[dk][String(eventId)]) {
+          const dayMarks = { ...updated[dk] };
+          delete dayMarks[String(eventId)];
+          if (Object.keys(dayMarks).length === 0) {
+            delete updated[dk];
+          } else {
+            updated[dk] = dayMarks;
+          }
+        }
+        return updated;
+      });
+    }
+    
     setState(s => {
       const evts = s.data.events || [];
       const idx = evts.findIndex(ev => String(ev.id) === String(eventId));
@@ -517,6 +633,9 @@ function EventsTable() {
           st: statesMap[e.id] || {},
           oddsMap,
           quotesMap,
+          lastUpdate: lastUpdateMap[String(e.id)] || null,
+          isLoading: quotesLoading,
+          showNoDataAlert: !!noDataAlerts[String(e.id)],
           maybeActive: !!entry.maybe,
           betActive: !!entry.bet,
           onToggleMaybe: () => toggleMaybe(e),
@@ -612,7 +731,7 @@ function App() {
 }
 
 render(h(App), document.getElementById("app"));
-function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggleMaybe, onToggleBet, onRemove, expandedOpen, insights, onToggleExpand, onCardMount, onCardUnmount }) {
+function MatchCard({ e, st, oddsMap, quotesMap, lastUpdate, isLoading, showNoDataAlert, maybeActive, betActive, onToggleMaybe, onToggleBet, onRemove, expandedOpen, insights, onToggleExpand, onCardMount, onCardUnmount }) {
   const eid = e.id || "";
   const dt = e.start_datetime ? new Date(e.start_datetime) : null;
   const home = e.home_name || e.home || "";
@@ -622,7 +741,33 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
   const hasScores = Array.isArray(st.scores_current) && st.scores_current.length === 2;
   const homeSc = hasScores ? String(st.scores_current[0]) : null;
   const awaySc = hasScores ? String(st.scores_current[1]) : null;
+  const homeScNum = hasScores ? parseInt(st.scores_current[0], 10) : null;
+  const awayScNum = hasScores ? parseInt(st.scores_current[1], 10) : null;
+  const homeLeading = (homeScNum !== null && awayScNum !== null && homeScNum > awayScNum);
+  const awayLeading = (homeScNum !== null && awayScNum !== null && awayScNum > homeScNum);
   const rootRef = useRef(null);
+  
+  // Auto-refresh timer for "X seconds ago" display
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  function formatLastUpdate(timestamp) {
+    if (!timestamp) return null;
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h`;
+  }
+  
+  function getStaleClass(timestamp) {
+    return '';
+  }
+  
   useEffect(() => {
     if (typeof onCardMount === 'function' && rootRef.current) onCardMount(eid, rootRef.current);
     return () => { if (typeof onCardUnmount === 'function' && rootRef.current) onCardUnmount(eid, rootRef.current); };
@@ -774,14 +919,21 @@ function MatchCard({ e, st, oddsMap, quotesMap, maybeActive, betActive, onToggle
       h("div", { class: "teams" },
         h("div", { class: "header-grid" }, [
           h("div", { class: "team-name home-name" }, home),
-          hasScores ? h("span", { class: "score-badge home-score" }, homeSc) : h("span", { class: "score-badge empty home-score" }, ""),
+          hasScores ? h("span", { class: `score-badge home-score${homeLeading ? ' leading' : ''}` }, homeSc) : h("span", { class: "score-badge empty home-score" }, ""),
           h("div", { class: "team-name away-name" }, away),
-          hasScores ? h("span", { class: "score-badge away-score" }, awaySc) : h("span", { class: "score-badge empty away-score" }, ""),
+          hasScores ? h("span", { class: `score-badge away-score${awayLeading ? ' leading' : ''}` }, awaySc) : h("span", { class: "score-badge empty away-score" }, ""),
         ]),
         leagueName ? h("div", { class: "league-name", title: "Competition" }, leagueName) : null
       )
     ),
     h("div", { class: `status ${status.class}` }, h("span", { class: "time" }, status.text)),
+    lastUpdate ? h("div", { class: `last-update ${getStaleClass(lastUpdate)}`, title: "Time since last offers update" }, [
+      showNoDataAlert ? h("span", { class: "no-data-alert" }, "Delayed") : null,
+      isLoading ? h("svg", { class: "refresh-icon", viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg" }, [
+        h("path", { d: "M21 10c-1 0-2 1-2 2 0 3-2 6-6 6s-6-3-6-6 3-6 6-6c2 0 3 1 4 2l-3 0 0 2 6 0 0-6-2 0 0 3c-1-2-3-3-5-3-5 0-8 4-8 8s3 8 8 8 8-4 8-8c0-1-1-2-2-2z", fill: "currentColor" })
+      ]) : null,
+      h("span", {}, formatLastUpdate(lastUpdate))
+    ]) : null,
     h("div", { class: "odds" },
       h(OddCell, { label: home || "Home", odds: homeOdds }),
       h(OddCell, { label: "Draw", odds: drawOdds }),
@@ -829,7 +981,9 @@ function OddCell({ label, odds, score, scoreClass, onScoreClick }) {
 
 function computeStatus(e, st) {
   const period = (st && st.match_period) ? String(st.match_period).toLowerCase() : '';
-  if (period === 'full_time') return { class: 'ended', text: 'EVENT ENDED' };
+  const state = (st && st.state) ? String(st.state).toLowerCase() : '';
+  // Check both match_period and state for ended matches
+  if (period === 'full_time' || state === 'ended') return { class: 'ended', text: 'EVENT ENDED' };
   const liveClock = (st && st.clock_text) ? String(st.clock_text) : null;
   if (liveClock) return { class: 'live', text: liveClock };
   const dt = e.start_datetime ? new Date(e.start_datetime) : null;

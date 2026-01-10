@@ -84,6 +84,10 @@ header { margin-bottom: 12px; }
   justify-self: start;
 }
 
+.score-badge.leading {
+  background: #00B073;
+}
+
 .score-badge.empty {
   background: transparent;
   color: transparent;
@@ -217,6 +221,48 @@ header { margin-bottom: 12px; }
   grid-row: 2;
   justify-self: end;
   margin-top: 4px;
+}
+
+.last-update {
+  grid-column: 1 / span 3;
+  grid-row: 3;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-align: right;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.last-update .refresh-icon {
+  width: 12px;
+  height: 12px;
+  animation: rotate 2s linear infinite;
+}
+
+.no-data-alert {
+  color: #fff;
+  font-weight: 700;
+  font-size: 9px;
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: #db3625;
+  border-radius: 3px;
+  text-transform: uppercase;
+  animation: pulse-alert 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-alert {
+  from { opacity: 1; }
+  to { opacity: 0.7; }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .confidence-green { background: #00B073; }
