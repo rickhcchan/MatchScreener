@@ -85,7 +85,6 @@ function EventsTable() {
         // Check if this event's markets/contracts are in the new data
         const hasData = 
           (e.winner_market_id && dataMap[e.winner_market_id]) ||
-          (e.correct_score_market_id && dataMap[e.correct_score_market_id]) ||
           (e.over_under_45_market_id && dataMap[e.over_under_45_market_id]) ||
           (e.over_under_55_market_id && dataMap[e.over_under_55_market_id]) ||
           (e.winner_contract_home_id && dataMap[e.winner_contract_home_id]) ||
@@ -201,17 +200,19 @@ function EventsTable() {
         const cids = [];
         (data.events || []).forEach(e => {
           if (e.winner_market_id) mids.push(String(e.winner_market_id));
-          if (e.correct_score_market_id) mids.push(String(e.correct_score_market_id));
           if (e.winner_contract_home_id) cids.push(String(e.winner_contract_home_id));
           if (e.winner_contract_draw_id) cids.push(String(e.winner_contract_draw_id));
           if (e.winner_contract_away_id) cids.push(String(e.winner_contract_away_id));
-          if (e.correct_score_any_other_home_win_contract_id) cids.push(String(e.correct_score_any_other_home_win_contract_id));
-          if (e.correct_score_any_other_away_win_contract_id) cids.push(String(e.correct_score_any_other_away_win_contract_id));
-          if (e.correct_score_any_other_draw_contract_id) cids.push(String(e.correct_score_any_other_draw_contract_id));
           if (e.over_under_45_market_id) mids.push(String(e.over_under_45_market_id));
           if (e.over_45_contract_id) cids.push(String(e.over_45_contract_id));
           if (e.over_under_55_market_id) mids.push(String(e.over_under_55_market_id));
           if (e.over_55_contract_id) cids.push(String(e.over_55_contract_id));
+          if (e.over_under_25_market_id) mids.push(String(e.over_under_25_market_id));
+          if (e.over_25_contract_id) cids.push(String(e.over_25_contract_id));
+          if (e.over_under_35_market_id) mids.push(String(e.over_under_35_market_id));
+          if (e.over_35_contract_id) cids.push(String(e.over_35_contract_id));
+          if (e.over_under_65_market_id) mids.push(String(e.over_under_65_market_id));
+          if (e.over_65_contract_id) cids.push(String(e.over_65_contract_id));
         });
         marketIdsRef.current = Array.from(new Set(mids));
         contractIdsRef.current = Array.from(new Set(cids));
@@ -789,75 +790,6 @@ function MatchCard({ e, st, oddsMap, quotesMap, lastUpdate, isLoading, showNoDat
   const statsBtnText = hasInsights && !statsAvailable ? "No Stats Available" : (expandedOpen ? "Hide Stats" : "View Stats");
   const leagueName = extractLeagueName(e.full_slug);
 
-  // Calculate Home Others and Away Others scores
-  function calculateOthersScores(insights) {
-    if (!insights || !insights.home || !insights.away) return { homeOthers: null, awayOthers: null };
-    
-    const home = insights.home;
-    const away = insights.away;
-    
-    // Helper to normalize percentages (0-1) to 0-100 scale
-    const pct = (val) => (typeof val === 'number' && Number.isFinite(val)) ? val * 100 : null;
-    
-    // Helper to normalize avg goals to 0-100 (4+ = 100, 0 = 0)
-    const goalScore = (val) => (typeof val === 'number' && Number.isFinite(val)) ? Math.min(100, (val / 4) * 100) : null;
-    
-    // Helper to average non-null values
-    const avg = (...values) => {
-      const valid = values.filter(v => v !== null && Number.isFinite(v));
-      return valid.length > 0 ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
-    };
-    
-    // HOME OTHERS SCORE
-    // Home team offensive (at home venue)
-    const homeOffensive = avg(
-      goalScore(home.avg_goals_scored),           // 25%: overall avg goals
-      pct(home.wins_others_pct),                  // 35%: win with 4+ goals
-      pct(home.home_ht_2plus_pct),                // 20%: HT 2+ at home
-      pct(home.ht_2plus_to_win_others_pct)        // 20%: HT 2+ → Win 4+
-    );
-    
-    // Away team defensive weakness (when away)
-    const awayDefensive = avg(
-      goalScore(away.avg_goals_conceded),                      // 25%: overall avg conceded
-      pct(away.losses_others_pct),                             // 35%: lose with 4+ conceded
-      pct(away.away_ht_2plus_conceded_pct),                    // 20%: HT 2+ conceded away
-      pct(away.away_ht_2plus_conceded_to_lost_others_pct)      // 20%: HT 2+ conceded → Lose 4+
-    );
-    
-    const homeOthersScore = avg(homeOffensive, awayDefensive);
-    
-    // AWAY OTHERS SCORE
-    // Away team offensive (when away)
-    const awayOffensive = avg(
-      goalScore(away.avg_goals_scored),
-      pct(away.wins_others_pct),
-      pct(away.away_ht_2plus_pct),                // at away venue
-      pct(away.ht_2plus_to_win_others_pct)
-    );
-    
-    // Home team defensive weakness (at home)
-    const homeDefensive = avg(
-      goalScore(home.avg_goals_conceded),
-      pct(home.losses_others_pct),
-      pct(home.home_ht_2plus_conceded_pct),                   // at home venue
-      pct(home.home_ht_2plus_conceded_to_lost_others_pct)
-    );
-    
-    const awayOthersScore = avg(awayOffensive, homeDefensive);
-    
-    // Invert scores: high score = high confidence to LAY (unlikely to happen)
-    return {
-      homeOthers: homeOthersScore !== null ? Math.round(100 - homeOthersScore) : null,
-      awayOthers: awayOthersScore !== null ? Math.round(100 - awayOthersScore) : null
-    };
-  }
-  
-  const othersScores = calculateOthersScores(insights);
-  
-  // Track highlight mode for stats
-  const [highlightMode, setHighlightMode] = useState(null); // null | 'home' | 'away'
-
   // Per-contract odds helper
   function oddsFor(marketId, contractId) {
     if (!marketId || !contractId) return { back: null, lay: null, last: null };
@@ -875,17 +807,19 @@ function MatchCard({ e, st, oddsMap, quotesMap, lastUpdate, isLoading, showNoDat
   }
 
   const wm = e.winner_market_id ? String(e.winner_market_id) : null;
-  const cs = e.correct_score_market_id ? String(e.correct_score_market_id) : null;
+  const ou25 = e.over_under_25_market_id ? String(e.over_under_25_market_id) : null;
+  const ou35 = e.over_under_35_market_id ? String(e.over_under_35_market_id) : null;
   const ou45 = e.over_under_45_market_id ? String(e.over_under_45_market_id) : null;
   const ou55 = e.over_under_55_market_id ? String(e.over_under_55_market_id) : null;
+  const ou65 = e.over_under_65_market_id ? String(e.over_under_65_market_id) : null;
   const homeOdds = oddsFor(wm, e.winner_contract_home_id ? String(e.winner_contract_home_id) : null);
   const drawOdds = oddsFor(wm, e.winner_contract_draw_id ? String(e.winner_contract_draw_id) : null);
   const awayOdds = oddsFor(wm, e.winner_contract_away_id ? String(e.winner_contract_away_id) : null);
-  const anyHomeOdds = oddsFor(cs, e.correct_score_any_other_home_win_contract_id ? String(e.correct_score_any_other_home_win_contract_id) : null);
-  const anyAwayOdds = oddsFor(cs, e.correct_score_any_other_away_win_contract_id ? String(e.correct_score_any_other_away_win_contract_id) : null);
-  const anyDrawOdds = oddsFor(cs, e.correct_score_any_other_draw_contract_id ? String(e.correct_score_any_other_draw_contract_id) : null);
+  const over25Odds = oddsFor(ou25, e.over_25_contract_id ? String(e.over_25_contract_id) : null);
+  const over35Odds = oddsFor(ou35, e.over_35_contract_id ? String(e.over_35_contract_id) : null);
   const over45Odds = oddsFor(ou45, e.over_45_contract_id ? String(e.over_45_contract_id) : null);
   const over55Odds = oddsFor(ou55, e.over_55_contract_id ? String(e.over_55_contract_id) : null);
+  const over65Odds = oddsFor(ou65, e.over_65_contract_id ? String(e.over_65_contract_id) : null);
 
   function scoreClass(s) {
     if (typeof s !== 'number' || !Number.isFinite(s)) return '';
@@ -938,17 +872,17 @@ function MatchCard({ e, st, oddsMap, quotesMap, lastUpdate, isLoading, showNoDat
       h(OddCell, { label: home || "Home", odds: homeOdds }),
       h(OddCell, { label: "Draw", odds: drawOdds }),
       h(OddCell, { label: away || "Away", odds: awayOdds }),
-      h("div", { class: "odd" }), // Spacer for grid alignment
+      h(OddCell, { label: "Over 2.5", odds: over25Odds }),
+      h(OddCell, { label: "Over 3.5", odds: over35Odds }),
       h(OddCell, { label: "Over 4.5", odds: over45Odds }),
       h(OddCell, { label: "Over 5.5", odds: over55Odds }),
-      h(OddCell, { label: "Home Others", odds: anyHomeOdds, score: othersScores.homeOthers, scoreClass, onScoreClick: () => setHighlightMode(highlightMode === 'home' ? null : 'home') }),
-      h(OddCell, { label: "Away Others", odds: anyAwayOdds, score: othersScores.awayOthers, scoreClass, onScoreClick: () => setHighlightMode(highlightMode === 'away' ? null : 'away') }),
+      h(OddCell, { label: "Over 6.5", odds: over65Odds }),
     ),
     h("div", { class: "analysis-toggle" },
       h("button", { class: "analysis-btn", onClick: onToggleExpand, disabled: !statsAvailable, title: (!statsAvailable ? "Stats not available" : "") }, statsBtnText),
       (url && url !== "#") ? h("a", { class: "analysis-btn", href: url, target: "smarkets", rel: "noopener noreferrer", title: "Open in Smarkets", onClick: (ev) => { ev.preventDefault(); try { window.open(url, 'smarkets', 'noopener'); } catch {} } }, "Open in Smarkets") : null
     ),
-    expandedOpen ? h(AnalysisPanel, { insights, highlightMode }) : null
+    expandedOpen ? h(AnalysisPanel, { insights }) : null
   );
 }
 
@@ -1029,7 +963,7 @@ function bpsToDecimal(bps) {
   return 10000 / n;
 }
 
-function AnalysisPanel({ insights, highlightMode }) {
+function AnalysisPanel({ insights }) {
   if (!insights || !insights.home || !insights.away) {
     return h("div", { class: "analysis-panel" }, h("div", { class: "small" }, ""));
   }
@@ -1037,40 +971,6 @@ function AnalysisPanel({ insights, highlightMode }) {
     if (typeof x !== 'number' || !Number.isFinite(x)) return '-';
     return `${Math.round(x * 100)}%`;
   }
-  
-  // Helper to check if a specific part should be dimmed
-  // part can be: 'goals_scored', 'goals_conceded', 'win_others', 'lost_others',
-  //              'ht_scored_home', 'ht_scored_away', 'ht_scored_win_home', 'ht_scored_win_away',
-  //              'ht_conceded_home', 'ht_conceded_away', 'ht_conceded_lost_home', 'ht_conceded_lost_away'
-  function isDimmed(team, part) {
-    if (!highlightMode) return false;
-    
-    if (highlightMode === 'home') {
-      // Laying Home Others: care about home offensive + away defensive
-      if (team === 'home') {
-        return ['goals_conceded', 'lost_others', 'ht_scored_away', 'ht_scored_win_away', 
-                'ht_conceded_home', 'ht_conceded_away', 'ht_conceded_lost_home', 'ht_conceded_lost_away'].includes(part);
-      } else { // away team
-        return ['goals_scored', 'win_others', 'ht_scored_home', 'ht_scored_away', 'ht_scored_win_home', 'ht_scored_win_away',
-                'ht_conceded_home', 'ht_conceded_lost_home'].includes(part);
-      }
-    } else if (highlightMode === 'away') {
-      // Laying Away Others: care about away offensive + home defensive
-      if (team === 'away') {
-        return ['goals_conceded', 'lost_others', 'ht_scored_home', 'ht_scored_win_home',
-                'ht_conceded_home', 'ht_conceded_away', 'ht_conceded_lost_home', 'ht_conceded_lost_away'].includes(part);
-      } else { // home team
-        return ['goals_scored', 'win_others', 'ht_scored_home', 'ht_scored_away', 'ht_scored_win_home', 'ht_scored_win_away',
-                'ht_conceded_away', 'ht_conceded_lost_away'].includes(part);
-      }
-    }
-    return false;
-  }
-  
-  // Helper to apply opacity to an element
-  const dim = (team, part, content) => {
-    return h("span", { style: isDimmed(team, part) ? "opacity: 0.35;" : "" }, content);
-  };
   
   const home = insights.home || {};
   const away = insights.away || {};
@@ -1096,46 +996,46 @@ function AnalysisPanel({ insights, highlightMode }) {
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(homeN))]),
           h("div", { class: "stat" }, [
             "HT Avg ⚽ / ⛔: ",
-            dim('home', 'goals_scored', h("strong", {}, home.avg_ht_goals_scored != null ? home.avg_ht_goals_scored.toFixed(2) : '-')),
-            h("span", { style: (isDimmed('home', 'goals_scored') && isDimmed('home', 'goals_conceded')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('home', 'goals_conceded', h("strong", {}, home.avg_ht_goals_conceded != null ? home.avg_ht_goals_conceded.toFixed(2) : '-')),
+            h("strong", {}, home.avg_ht_goals_scored != null ? home.avg_ht_goals_scored.toFixed(2) : '-'),
+            " / ",
+            h("strong", {}, home.avg_ht_goals_conceded != null ? home.avg_ht_goals_conceded.toFixed(2) : '-'),
           ]),
           h("div", { class: "stat" }, [
             "FT Avg ⚽ / ⛔: ",
-            dim('home', 'goals_scored', h("strong", {}, home.avg_goals_scored != null ? home.avg_goals_scored.toFixed(2) : '-')),
-            h("span", { style: (isDimmed('home', 'goals_scored') && isDimmed('home', 'goals_conceded')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('home', 'goals_conceded', h("strong", {}, home.avg_goals_conceded != null ? home.avg_goals_conceded.toFixed(2) : '-')),
+            h("strong", {}, home.avg_goals_scored != null ? home.avg_goals_scored.toFixed(2) : '-'),
+            " / ",
+            h("strong", {}, home.avg_goals_conceded != null ? home.avg_goals_conceded.toFixed(2) : '-'),
           ]),
           h("div", { class: "stat" }, [
-            dim('home', 'win_others', "Win Others"),
-            h("span", { style: (isDimmed('home', 'win_others') && isDimmed('home', 'lost_others')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('home', 'lost_others', "Lost Others"),
+            "Win Others",
+            " / ",
+            "Lost Others",
             ": ",
-            dim('home', 'win_others', h("strong", {}, (typeof home.wins_others_pct === 'number' ? percent(home.wins_others_pct) : '-'))),
-            h("span", { style: (isDimmed('home', 'win_others') && isDimmed('home', 'lost_others')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('home', 'lost_others', h("strong", {}, (typeof home.losses_others_pct === 'number' ? percent(home.losses_others_pct) : '-'))),
+            h("strong", {}, (typeof home.wins_others_pct === 'number' ? percent(home.wins_others_pct) : '-')),
+            " / ",
+            h("strong", {}, (typeof home.losses_others_pct === 'number' ? percent(home.losses_others_pct) : '-')),
           ]),
           // Only show HT stats if they exist
           ...(typeof home.home_ht_2plus_pct === 'number' || typeof home.away_ht_2plus_pct === 'number' ? [
             h("div", { class: "stat" }, [
-              h("span", { style: (isDimmed('home', 'ht_scored_home') && isDimmed('home', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, "HT 2+ ⚽ → Win 4+ (H / A): "),
-              dim('home', 'ht_scored_home', h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_scored_home') && isDimmed('home', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('home', 'ht_scored_away', h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_scored_home') && isDimmed('home', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " → "),
-              dim('home', 'ht_scored_win_home', h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_scored_win_home') && isDimmed('home', 'ht_scored_win_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('home', 'ht_scored_win_away', h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-'))),
+              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              h("strong", {}, (typeof home.home_ht_2plus_pct === 'number' ? percent(home.home_ht_2plus_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_pct === 'number' ? percent(home.away_ht_2plus_pct) : '-')),
+              " → ",
+              h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.ht_2plus_to_win_others_pct === 'number' ? percent(home.ht_2plus_to_win_others_pct) : '-')),
             ]),
             h("div", { class: "stat" }, [
-              dim('home', 'ht_conceded_home', "HT 2+ ⛔ → Lost 4+ (H / A): "),
-              dim('home', 'ht_conceded_home', h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_conceded_home') && isDimmed('home', 'ht_conceded_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('home', 'ht_conceded_away', h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_conceded_home') && isDimmed('home', 'ht_conceded_away')) ? "opacity: 0.35;" : "" }, " → "),
-              dim('home', 'ht_conceded_lost_home', h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-'))),
-              h("span", { style: (isDimmed('home', 'ht_conceded_lost_home') && isDimmed('home', 'ht_conceded_lost_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('home', 'ht_conceded_lost_away', h("strong", {}, (typeof home.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.away_ht_2plus_conceded_to_lost_others_pct) : '-'))),
+              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              h("strong", {}, (typeof home.home_ht_2plus_conceded_pct === 'number' ? percent(home.home_ht_2plus_conceded_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_conceded_pct === 'number' ? percent(home.away_ht_2plus_conceded_pct) : '-')),
+              " → ",
+              h("strong", {}, (typeof home.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof home.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(home.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
             ]),
           ] : []),
         ] : [
@@ -1149,46 +1049,46 @@ function AnalysisPanel({ insights, highlightMode }) {
           h("div", { class: "stat" }, ["Matches: ", h("strong", {}, String(awayN))]),
           h("div", { class: "stat" }, [
             "HT Avg ⚽ / ⛔: ",
-            dim('away', 'goals_scored', h("strong", {}, away.avg_ht_goals_scored != null ? away.avg_ht_goals_scored.toFixed(2) : '-')),
-            h("span", { style: (isDimmed('away', 'goals_scored') && isDimmed('away', 'goals_conceded')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('away', 'goals_conceded', h("strong", {}, away.avg_ht_goals_conceded != null ? away.avg_ht_goals_conceded.toFixed(2) : '-')),
+            h("strong", {}, away.avg_ht_goals_scored != null ? away.avg_ht_goals_scored.toFixed(2) : '-'),
+            " / ",
+            h("strong", {}, away.avg_ht_goals_conceded != null ? away.avg_ht_goals_conceded.toFixed(2) : '-'),
           ]),
           h("div", { class: "stat" }, [
             "FT Avg ⚽ / ⛔: ",
-            dim('away', 'goals_scored', h("strong", {}, away.avg_goals_scored != null ? away.avg_goals_scored.toFixed(2) : '-')),
-            h("span", { style: (isDimmed('away', 'goals_scored') && isDimmed('away', 'goals_conceded')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('away', 'goals_conceded', h("strong", {}, away.avg_goals_conceded != null ? away.avg_goals_conceded.toFixed(2) : '-')),
+            h("strong", {}, away.avg_goals_scored != null ? away.avg_goals_scored.toFixed(2) : '-'),
+            " / ",
+            h("strong", {}, away.avg_goals_conceded != null ? away.avg_goals_conceded.toFixed(2) : '-'),
           ]),
           h("div", { class: "stat" }, [
-            dim('away', 'win_others', "Win Others"),
-            h("span", { style: (isDimmed('away', 'win_others') && isDimmed('away', 'lost_others')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('away', 'lost_others', "Lost Others"),
+            "Win Others",
+            " / ",
+            "Lost Others",
             ": ",
-            dim('away', 'win_others', h("strong", {}, (typeof away.wins_others_pct === 'number' ? percent(away.wins_others_pct) : '-'))),
-            h("span", { style: (isDimmed('away', 'win_others') && isDimmed('away', 'lost_others')) ? "opacity: 0.35;" : "" }, " / "),
-            dim('away', 'lost_others', h("strong", {}, (typeof away.losses_others_pct === 'number' ? percent(away.losses_others_pct) : '-'))),
+            h("strong", {}, (typeof away.wins_others_pct === 'number' ? percent(away.wins_others_pct) : '-')),
+            " / ",
+            h("strong", {}, (typeof away.losses_others_pct === 'number' ? percent(away.losses_others_pct) : '-')),
           ]),
           // Only show HT stats if they exist
           ...(typeof away.home_ht_2plus_pct === 'number' || typeof away.away_ht_2plus_pct === 'number' ? [
             h("div", { class: "stat" }, [
-              h("span", { style: (isDimmed('away', 'ht_scored_home') && isDimmed('away', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, "HT 2+ ⚽ → Win 4+ (H / A): "),
-              dim('away', 'ht_scored_home', h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_scored_home') && isDimmed('away', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('away', 'ht_scored_away', h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_scored_home') && isDimmed('away', 'ht_scored_away')) ? "opacity: 0.35;" : "" }, " → "),
-              dim('away', 'ht_scored_win_home', h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_scored_win_home') && isDimmed('away', 'ht_scored_win_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('away', 'ht_scored_win_away', h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-'))),
+              "HT 2+ ⚽ → Win 4+ (H / A): ",
+              h("strong", {}, (typeof away.home_ht_2plus_pct === 'number' ? percent(away.home_ht_2plus_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_pct === 'number' ? percent(away.away_ht_2plus_pct) : '-')),
+              " → ",
+              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.ht_2plus_to_win_others_pct === 'number' ? percent(away.ht_2plus_to_win_others_pct) : '-')),
             ]),
             h("div", { class: "stat" }, [
-              dim('away', 'ht_conceded_away', "HT 2+ ⛔ → Lost 4+ (H / A): "),
-              dim('away', 'ht_conceded_home', h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_conceded_home') && isDimmed('away', 'ht_conceded_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('away', 'ht_conceded_away', h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_conceded_home') && isDimmed('away', 'ht_conceded_away')) ? "opacity: 0.35;" : "" }, " → "),
-              dim('away', 'ht_conceded_lost_home', h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-'))),
-              h("span", { style: (isDimmed('away', 'ht_conceded_lost_home') && isDimmed('away', 'ht_conceded_lost_away')) ? "opacity: 0.35;" : "" }, " / "),
-              dim('away', 'ht_conceded_lost_away', h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-'))),
+              "HT 2+ ⛔ → Lost 4+ (H / A): ",
+              h("strong", {}, (typeof away.home_ht_2plus_conceded_pct === 'number' ? percent(away.home_ht_2plus_conceded_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_conceded_pct === 'number' ? percent(away.away_ht_2plus_conceded_pct) : '-')),
+              " → ",
+              h("strong", {}, (typeof away.home_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.home_ht_2plus_conceded_to_lost_others_pct) : '-')),
+              " / ",
+              h("strong", {}, (typeof away.away_ht_2plus_conceded_to_lost_others_pct === 'number' ? percent(away.away_ht_2plus_conceded_to_lost_others_pct) : '-')),
             ]),
           ] : []),
         ] : [

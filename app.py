@@ -96,24 +96,30 @@ def api_events(day: Optional[str] = None):
             enriched_markets.append(e)
         events = enriched_markets
 
-        # Require both Winner 3-way and Correct Score markets
-        events = [e for e in events if e.get("winner_market_id") and e.get("correct_score_market_id")]
+        # Require Winner 3-way market
+        events = [e for e in events if e.get("winner_market_id")]
 
-        # Collect market IDs to fetch contracts (WINNER_3_WAY + CORRECT_SCORE + OVER_UNDER 4.5 + OVER_UNDER 5.5)
+        # Collect market IDs to fetch contracts (WINNER_3_WAY + OVER_UNDER 2.5/3.5/4.5/5.5/6.5)
         market_ids: list[str] = []
         for e in events:
             wm = e.get("winner_market_id")
-            cs = e.get("correct_score_market_id")
+            over_25_market_id = e.get("over_under_25_market_id")
+            over_35_market_id = e.get("over_under_35_market_id")
             over_45_market_id = e.get("over_under_45_market_id")
             over_55_market_id = e.get("over_under_55_market_id")
+            over_65_market_id = e.get("over_under_65_market_id")
             if wm:
                 market_ids.append(str(wm))
-            if cs:
-                market_ids.append(str(cs))
+            if over_25_market_id:
+                market_ids.append(str(over_25_market_id))
+            if over_35_market_id:
+                market_ids.append(str(over_35_market_id))
             if over_45_market_id:
                 market_ids.append(str(over_45_market_id))
             if over_55_market_id:
                 market_ids.append(str(over_55_market_id))
+            if over_65_market_id:
+                market_ids.append(str(over_65_market_id))
         contract_map: Dict[str, Any] = {}
         if market_ids:
             try:
@@ -147,27 +153,6 @@ def api_events(day: Optional[str] = None):
                 if home_id and draw_id and away_id:
                     break
 
-            # Correct score: any-other outcomes
-            any_other_home_id = None
-            any_other_away_id = None
-            any_other_draw_id = None
-            cs = e.get("correct_score_market_id")
-            cs_contracts = contract_map.get(str(cs), []) if cs else []
-            for c in cs_contracts:
-                cid = str(c.get("id")) if c.get("id") is not None else None
-                if not cid:
-                    continue
-                ctype = (c.get("contract_type") or {}).get("name") or ""
-                slug = (c.get("slug") or "").lower().strip()
-                name = (c.get("name") or "").lower().strip()
-                t = ctype.upper().strip()
-                if t == "ANY_OTHER_HOME_WIN" or slug == "any-other-home-win" or "any other home win" in name:
-                    any_other_home_id = cid
-                elif t == "ANY_OTHER_AWAY_WIN" or slug == "any-other-away-win" or "any other away win" in name:
-                    any_other_away_id = cid
-                elif t == "ANY_OTHER_DRAW" or slug == "any-other-draw" or "any other draw" in name:
-                    any_other_draw_id = cid
-
             # Over/Under 4.5
             over_45_contract_id = None
             over_45_market_id = e.get("over_under_45_market_id")
@@ -194,16 +179,55 @@ def api_events(day: Optional[str] = None):
                 if t == "OVER":
                     over_55_contract_id = cid
 
+            # Over/Under 2.5
+            over_25_contract_id = None
+            over_25_market_id = e.get("over_under_25_market_id")
+            over_25_contracts = contract_map.get(str(over_25_market_id), []) if over_25_market_id else []
+            for c in over_25_contracts:
+                cid = str(c.get("id")) if c.get("id") is not None else None
+                if not cid:
+                    continue
+                ctype = (c.get("contract_type") or {}).get("name") or ""
+                t = ctype.upper().strip()
+                if t == "OVER":
+                    over_25_contract_id = cid
+
+            # Over/Under 3.5
+            over_35_contract_id = None
+            over_35_market_id = e.get("over_under_35_market_id")
+            over_35_contracts = contract_map.get(str(over_35_market_id), []) if over_35_market_id else []
+            for c in over_35_contracts:
+                cid = str(c.get("id")) if c.get("id") is not None else None
+                if not cid:
+                    continue
+                ctype = (c.get("contract_type") or {}).get("name") or ""
+                t = ctype.upper().strip()
+                if t == "OVER":
+                    over_35_contract_id = cid
+
+            # Over/Under 6.5
+            over_65_contract_id = None
+            over_65_market_id = e.get("over_under_65_market_id")
+            over_65_contracts = contract_map.get(str(over_65_market_id), []) if over_65_market_id else []
+            for c in over_65_contracts:
+                cid = str(c.get("id")) if c.get("id") is not None else None
+                if not cid:
+                    continue
+                ctype = (c.get("contract_type") or {}).get("name") or ""
+                t = ctype.upper().strip()
+                if t == "OVER":
+                    over_65_contract_id = cid
+
             enriched_contracts.append({
                 **e,
                 "winner_contract_home_id": home_id,
                 "winner_contract_draw_id": draw_id,
                 "winner_contract_away_id": away_id,
-                "correct_score_any_other_home_win_contract_id": any_other_home_id,
-                "correct_score_any_other_away_win_contract_id": any_other_away_id,
-                "correct_score_any_other_draw_contract_id": any_other_draw_id,
                 "over_45_contract_id": over_45_contract_id,
                 "over_55_contract_id": over_55_contract_id,
+                "over_25_contract_id": over_25_contract_id,
+                "over_35_contract_id": over_35_contract_id,
+                "over_65_contract_id": over_65_contract_id,
             })
         events = enriched_contracts
         data = {"count": len(events), "events": events}
